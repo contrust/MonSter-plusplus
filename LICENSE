@@ -1,0 +1,83 @@
+MonSter-plusplus Model License v1.0
+Release Date: October 20, 2025
+Copyright (c) Autel Robotics Co., Ltd.
+Copyright (c) Huazhong University of Science and Technology
+All Rights Reserved.
+
+--------------------------------------------
+1. DEFINITIONS
+--------------------------------------------
+“MonSter-plusplus Materials” include the stereo vision and depth estimation models, trained model weights, algorithms, and documentation released under this License.  
+These models were trained using publicly available datasets (including but not limited to KITTI, Middlebury, ETH3D, TartanAir, etc.) that are subject to their own research-only or non-commercial licenses.
+
+“Licensors” means Autel Robotics Co., Ltd. and Huazhong University of Science and Technology.  
+“Licensee” means any individual or entity accessing, using, reproducing, or distributing the MonSter-plusplus Materials under this License.
+
+By accessing or using any portion of the MonSter-plusplus Materials, you agree to this License.
+
+--------------------------------------------
+2. LICENSE GRANT
+--------------------------------------------
+The Licensors grant you a non-exclusive, worldwide, non-transferable, and royalty-free license to use, reproduce, and modify the MonSter-plusplus Materials **solely for non-commercial research and educational purposes.**
+
+Redistribution is allowed only for academic and research purposes under the same terms.  
+The trained model weights incorporate data derived from third-party research-only datasets and must not be used or redistributed for any commercial or safety-critical purpose.
+
+**Commercial use, redistribution, or offering of services based on the MonSter-plusplus Materials or derivatives thereof is strictly prohibited** unless expressly authorized in writing by the Licensors.
+
+--------------------------------------------
+3. REDISTRIBUTION CONDITIONS
+--------------------------------------------
+If you share or distribute the MonSter-plusplus Materials or derivatives:
+- You must include a copy of this License.
+- You must retain the following attribution notice in all copies:
+
+  “MonSter-plusplus model is licensed under the MonSter-plusplus Model License.  
+  Copyright © Autel Robotics Co., Ltd. and Huazhong University of Science and Technology. All Rights Reserved.”
+
+- You must not use the MonSter-plusplus Materials for commercial, military, or safety-critical systems, including autonomous vehicles, drones, robotics, surveillance, or law enforcement.
+- You must comply with all applicable laws, including export control regulations.
+
+--------------------------------------------
+4. RESEARCH-ONLY USE
+--------------------------------------------
+The MonSter-plusplus Materials are provided **for non-commercial research and educational use only.**  
+Any commercial, military, defense-related, or safety-critical use is prohibited.
+
+--------------------------------------------
+5. DISCLAIMER OF WARRANTY
+--------------------------------------------
+THE MONSTER-PLUSPLUS MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF TITLE, NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+
+--------------------------------------------
+6. LIMITATION OF LIABILITY
+--------------------------------------------
+IN NO EVENT SHALL THE LICENSORS OR THEIR AFFILIATES BE LIABLE FOR ANY DAMAGES, INCLUDING INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, ARISING FROM THE USE OR INABILITY TO USE THE MONSTER-PLUSPLUS MATERIALS.
+
+--------------------------------------------
+7. INTELLECTUAL PROPERTY
+--------------------------------------------
+No trademark or patent rights are granted under this License.  
+You may not use the names, logos, or marks of the Licensors except for academic citation.  
+You may not file or assert any patent claims derived from or implemented using the MonSter-plusplus Materials.
+
+The MonSter-plusplus models were trained on third-party datasets under non-commercial terms; Licensees must comply with any such upstream restrictions.
+
+--------------------------------------------
+8. TERMINATION
+--------------------------------------------
+This License automatically terminates if the Licensee breaches any restriction, including commercial or military use.  
+Upon termination, all copies must be deleted immediately.  
+Sections 5 (Disclaimer), 6 (Liability), and 9 (Governing Law) survive termination.
+
+--------------------------------------------
+9. GOVERNING LAW
+--------------------------------------------
+This License is governed by the laws of the People’s Republic of China.  
+Disputes shall be submitted to the People’s Court of Nanshan District, Shenzhen, Guangdong Province.
+
+--------------------------------------------
+10. CONTACT
+--------------------------------------------
+For licensing inquiries or collaborations:
+📧 compliance@autelrobotics.com
