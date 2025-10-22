@@ -1,83 +1,162 @@
-MonSter-plusplus Model License v1.0
-Release Date: October 20, 2025
-Copyright (c) Autel Robotics Co., Ltd.
-Copyright (c) Huazhong University of Science and Technology
-All Rights Reserved.
+MonSter-plusplus Model License v1.0, Release Date: October 20, 2025
 
---------------------------------------------
-1. DEFINITIONS
---------------------------------------------
-“MonSter-plusplus Materials” include the stereo vision and depth estimation models, trained model weights, algorithms, and documentation released under this License.  
-These models were trained using publicly available datasets (including but not limited to KITTI, Middlebury, ETH3D, TartanAir, etc.) that are subject to their own research-only or non-commercial licenses.
+"Agreement" means the terms and conditions for use, reproduction,
+distribution, and modification of the Monster-plusplus Materials set
+forth herein.
 
-“Licensors” means Autel Robotics Co., Ltd. and Huazhong University of Science and Technology.  
-“Licensee” means any individual or entity accessing, using, reproducing, or distributing the MonSter-plusplus Materials under this License.
+"Monster-plusplus Materials" means, collectively, the stereo vision
+and depth estimation models, trained model weights, algorithms, and
+documentation distributed under this Agreement. The Monster-plusplus
+models were trained using publicly available datasets (including but not
+limited to KITTI, Middlebury, ETH3D, TartanAir, etc.) that are subject
+to their respective research-only or non-commercial licenses.
 
-By accessing or using any portion of the MonSter-plusplus Materials, you agree to this License.
+"Licensors" means Autel Robotics Co., Ltd. and Huazhong University
+of Science and Technology, who jointly release the Monster-plusplus
+Materials under this Agreement but do not claim ownership of the
+underlying datasets used for model training.
 
---------------------------------------------
-2. LICENSE GRANT
---------------------------------------------
-The Licensors grant you a non-exclusive, worldwide, non-transferable, and royalty-free license to use, reproduce, and modify the MonSter-plusplus Materials **solely for non-commercial research and educational purposes.**
+"Licensee" or "you" means any individual or entity accessing,
+using, reproducing, or distributing the Monster-plusplus Materials under
+this Agreement.
 
-Redistribution is allowed only for academic and research purposes under the same terms.  
-The trained model weights incorporate data derived from third-party research-only datasets and must not be used or redistributed for any commercial or safety-critical purpose.
+By accessing or using any portion of the Monster-plusplus Materials, you
+agree to be bound by this Agreement.
 
-**Commercial use, redistribution, or offering of services based on the MonSter-plusplus Materials or derivatives thereof is strictly prohibited** unless expressly authorized in writing by the Licensors.
+1. License Rights and Redistribution.
 
---------------------------------------------
-3. REDISTRIBUTION CONDITIONS
---------------------------------------------
-If you share or distribute the MonSter-plusplus Materials or derivatives:
-- You must include a copy of this License.
-- You must retain the following attribution notice in all copies:
+a. Grant of Rights.
 
-  “MonSter-plusplus model is licensed under the MonSter-plusplus Model License.  
-  Copyright © Autel Robotics Co., Ltd. and Huazhong University of Science and Technology. All Rights Reserved.”
+You are granted a non-exclusive, worldwide, non-transferable, and
+royalty-free limited license under the Licensors' intellectual property
+or other rights to the extent such rights exist embodied in the
+Monster-plusplus Materials to use, reproduce, and modify the
+Monster-plusplus Materials solely for non-commercial research and
+educational purposes. Redistribution is permitted only within academic
+or research contexts under the same terms. The trained model weights
+incorporate information derived from third-party research-only datasets
+and must not be used or redistributed for any commercial or
+safety-critical application.
 
-- You must not use the MonSter-plusplus Materials for commercial, military, or safety-critical systems, including autonomous vehicles, drones, robotics, surveillance, or law enforcement.
-- You must comply with all applicable laws, including export control regulations.
+Any commercial use, redistribution, or offering of services based on the
+Monster-plusplus Materials or derivatives thereof is prohibited unless
+expressly authorized in writing by the Licensors.
 
---------------------------------------------
-4. RESEARCH-ONLY USE
---------------------------------------------
-The MonSter-plusplus Materials are provided **for non-commercial research and educational use only.**  
-Any commercial, military, defense-related, or safety-critical use is prohibited.
+b. Redistribution and Use.
 
---------------------------------------------
-5. DISCLAIMER OF WARRANTY
---------------------------------------------
-THE MONSTER-PLUSPLUS MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF TITLE, NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+i. If you distribute or make the Monster-plusplus Materials, or any
+derivative works thereof, available to a third party, you shall provide
+a copy of this Agreement to such third party.
 
---------------------------------------------
-6. LIMITATION OF LIABILITY
---------------------------------------------
-IN NO EVENT SHALL THE LICENSORS OR THEIR AFFILIATES BE LIABLE FOR ANY DAMAGES, INCLUDING INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, ARISING FROM THE USE OR INABILITY TO USE THE MONSTER-PLUSPLUS MATERIALS.
+ii. You must retain in all copies the following attribution notice:
+"Monster-plusplus model is licensed under the Monster-plusplus Model
+License, Copyright © Autel Robotics Co., Ltd. and Huazhong University of
+Science and Technology. All Rights Reserved."
 
---------------------------------------------
-7. INTELLECTUAL PROPERTY
---------------------------------------------
-No trademark or patent rights are granted under this License.  
-You may not use the names, logos, or marks of the Licensors except for academic citation.  
-You may not file or assert any patent claims derived from or implemented using the MonSter-plusplus Materials.
+iii. The Monster-plusplus Materials and any derivative works thereof
+shall not be used for any commercial purpose, including but not limited
+to applications in autonomous vehicles, drones, robotics, surveillance,
+or other safety-critical systems, nor for any military or
+law-enforcement purpose.
 
-The MonSter-plusplus models were trained on third-party datasets under non-commercial terms; Licensees must comply with any such upstream restrictions.
+iv. Your use of the Monster-plusplus Materials must comply with all
+applicable laws and export control regulations.
 
---------------------------------------------
-8. TERMINATION
---------------------------------------------
-This License automatically terminates if the Licensee breaches any restriction, including commercial or military use.  
-Upon termination, all copies must be deleted immediately.  
-Sections 5 (Disclaimer), 6 (Liability), and 9 (Governing Law) survive termination.
+v. The Monster-plusplus Materials shall not be used for any activity
+that may endanger national security, harm public interests, or infringe
+upon the lawful rights of others, as defined by applicable laws and
+regulations.
 
---------------------------------------------
-9. GOVERNING LAW
---------------------------------------------
-This License is governed by the laws of the People’s Republic of China.  
-Disputes shall be submitted to the People’s Court of Nanshan District, Shenzhen, Guangdong Province.
+2. Research-Only Restriction.
 
---------------------------------------------
-10. CONTACT
---------------------------------------------
-For licensing inquiries or collaborations:
-📧 compliance@autelrobotics.com
+The Monster-plusplus Materials are provided for non-commercial
+research and educational use only. Any commercial, military or
+defense-related, or safety-critical application is prohibited.
+
+3. Disclaimer of Warranty.
+
+UNLESS REQUIRED BY APPLICABLE LAW, THE MONSTER-PLUSPLUS MATERIALS AND
+ANY OUTPUT AND RESULTS THEREFROM ARE PROVIDED ON AN "AS IS" BASIS,
+WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING,
+WITHOUT LIMITATION, ANY WARRANTIES OF TITLE, NON-INFRINGEMENT,
+MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE. YOU ARE SOLELY
+RESPONSIBLE FOR DETERMINING THE APPROPRIATENESS OF USING OR
+REDISTRIBUTING THE MONSTER-PLUSPLUS MATERIALS AND ASSUME ANY RISKS
+ASSOCIATED WITH YOUR USE OF THE MONSTER-PLUSPLUS MATERIALS AND ANY
+OUTPUT AND RESULTS.
+
+4. Limitation of Liability.
+
+IN NO EVENT WILL LICENSORS OR ITS AFFILIATES BE LIABLE UNDER ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, TORT, NEGLIGENCE, PRODUCTS LIABILITY,
+OR OTHERWISE, ARISING OUT OF THIS AGREEMENT, FOR ANY LOST PROFITS OR ANY
+INDIRECT, SPECIAL, CONSEQUENTIAL, INCIDENTAL, EXEMPLARY OR PUNITIVE
+DAMAGES, EVEN IF LICENSORS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE
+POSSIBILITY OF ANY OF THE FOREGOING.
+
+5. Intellectual Property.
+
+a. No trademark licenses are granted under this Agreement.
+
+Licensees may not use the names, logos, or marks of the Licensors in a
+manner that suggests endorsement or affiliation, except for reasonable
+academic citation or attribution purposes.
+
+b. No patent rights are granted under this Agreement.
+
+Licensees shall not file or assert any patent application covering
+inventions derived from or implemented using the Monster-plusplus
+Materials. All patent rights in the Monster-plusplus Materials remain
+with the Licensors.
+
+c. Litigation and Indemnification.
+
+If you institute litigation or other proceedings against the Licensors
+(including a cross-claim or counterclaim in a lawsuit) alleging that the
+Monster-plusplus Materials or Monster-plusplus outputs or results, or
+any portion thereof, infringe any intellectual property or other rights
+owned or licensable by you, then any licenses granted to you under this
+Agreement shall automatically terminate as of the date such litigation
+or claim is filed or instituted. You will indemnify and hold harmless
+the Licensors from and against any claim, loss, or liability by any
+third party arising out of or related to your use or distribution of the
+Monster-plusplus Materials. The Licensors make no representation or
+warranty regarding the rights of third parties in any datasets used for
+model training.
+
+d. Data Sources and Third-Party Rights.
+
+The Monster-plusplus model was trained using publicly available datasets
+(including but not limited to KITTI, ETH3D, Middlebury, TartanAir, etc.)
+that are restricted to non-commercial research use. Licensees must
+comply with the applicable non-commercial terms and any other
+restrictions of those datasets. The Licensors acknowledge that certain
+datasets used in training the Monster-plusplus model may themselves
+contain third-party data governed by additional terms. Licensees are
+responsible for ensuring compliance with any such upstream requirements.
+
+6. Term and Termination.
+
+This Agreement becomes effective upon your access to or use of the
+Monster-plusplus Materials. It will remain in effect until terminated as
+provided herein. This Agreement will automatically terminate if the
+Licensee uses the Monster-plusplus Materials for any commercial,
+military or defense-related, or safety-critical purpose, or breaches any
+restriction stated in this Agreement. Upon termination, the Licensee
+must immediately cease all use of the Monster-plusplus Materials and
+delete any copies in their possession. Sections 3 (Disclaimer of
+Warranty), 4 (Limitation of Liability), and 7 (Governing Law and
+Jurisdiction) shall survive termination.
+
+7. Governing Law and Jurisdiction.
+
+This Agreement shall be governed by and construed in accordance with the
+laws of the People's Republic of China. Any disputes shall be submitted
+to the People's Court of Nanshan District, Shenzhen, Guangdong Province.
+
+8. Updates and Contact.
+
+This License may be updated by the Licensors to reflect future model
+versions, dataset changes, or expanded usage terms. For inquiries
+related to licensing, redistribution, or collaborations, please contact:
+compliance@autelrobotics.com.
