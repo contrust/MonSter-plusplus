@@ -149,7 +149,7 @@ class StereoDataset(data.Dataset):
         return len(self.image_list)
 
 class US3D(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/us3d', image_set='images', disp_set='disp'):
+    def __init__(self, aug_params=None, root='../../Monster/datasets/us3d', image_set='images', disp_set='disp'):
         super(US3D, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispUS3D)
         self.root = root
         self.image_set = image_set
