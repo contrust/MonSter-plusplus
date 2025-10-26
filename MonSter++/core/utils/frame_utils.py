@@ -159,7 +159,7 @@ def writeFlow(filename,uv,v=None):
 
 def readDispUS3D(file_name):
     disp = np.array(Image.open(file_name), dtype=np.float32)
-    valid = disp > 0
+    valid = disp > -900
     return disp, valid
 
 def readFlowKITTI(filename):
