@@ -1,0 +1,35 @@
+tensorboard: {}
+project_name: monster-us3d-no-aug-colormap
+restore_ckpt: ./checkpoints/Mix_all_large.pth
+project_dir: ./logs/us3d/
+encoder: 'vitl'
+batch_size: 8
+train_datasets: ['us3d']
+train_split_ratio: 0.7
+val_split_ratio: 0.15
+lr: 2e-4
+wdecay: 1e-5
+current_total_step: 0
+current_val_step: 0
+total_step: 34000
+save_frequency: 3750
+save_path: ./checkpoints/us3d/
+train_image_frequency: 25
+val_image_frequency: 25
+val_frequency: 50
+image_size: [256, 1024]
+train_iters: 22
+valid_iters: 32
+corr_implementation: "reg"
+corr_levels: 2
+corr_radius: 4
+n_downsample: 2
+n_gru_layers: 3
+hidden_dims: [128, 128, 128]
+max_disp: 128
+saturation_range: [1.0, 1.0]
+do_flip: ''
+spatial_scale: [-0.2, 0.0]
+noyjitter: True
+num_gpu: 8
+seed: 666
