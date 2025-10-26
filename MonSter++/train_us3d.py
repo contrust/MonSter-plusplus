@@ -261,11 +261,6 @@ def main(cfg):
                     torch.cuda.empty_cache()
                     model.eval()
                     elem_num, total_epe, total_out1, total_out2, total_out3, total_out4, total_out5 = 0, 0, 0, 0, 0, 0, 0
-                    total_out1 = total_out1.to(accelerator.device)
-                    total_out2 = total_out2.to(accelerator.device)
-                    total_out3 = total_out3.to(accelerator.device)
-                    total_out4 = total_out4.to(accelerator.device)
-                    total_out5 = total_out5.to(accelerator.device)
                     for data in tqdm(val_loader, dynamic_ncols=True, disable=not accelerator.is_main_process):
                         val_step += 1
                         (imageL_file, imageR_file, GT_file), left, right, disp_gt, valid = [x for x in data]
