@@ -196,24 +196,47 @@ class FlowAugmentor:
         return img1, img2, flow
 
 class SparseFlowAugmentor:
-    def __init__(self, crop_size, min_scale=-0.2, max_scale=0.5, do_flip=False, yjitter=False, saturation_range=[0.7,1.3], gamma=[1,1,1,1]):
-        # spatial augmentation params
+    def __init__(self,
+                 crop_size,
+                 min_scale=-0.2,
+                 max_scale=0.0,
+                 do_flip=False,
+                 yjitter=False,
+                 brightness_range=0.0,
+                 contrast_range=0.0,
+                 saturation_range=[1.0,1.0],
+                 hue_range=0.0/3.14,
+                 gamma=[1,1,1,1],
+                 spatial_aug_prob=0.8,
+                 stretch_prob=0.0,
+                 max_stretch=0.0,
+                 h_flip_prob=0.0,
+                 v_flip_prob=0.0,
+                 asymmetric_color_aug_prob=0.0,
+                 noise_aug_prob=0.0,
+                 noise_sigma_range=[0.0, 0.0],
+                 eraser_aug_prob=0.0):
+        # spatial augmentation params.
         self.crop_size = crop_size
         self.min_scale = min_scale
         self.max_scale = max_scale
-        self.spatial_aug_prob = 0.8
-        self.stretch_prob = 0.8
-        self.max_stretch = 0.2
+        self.spatial_aug_prob = spatial_aug_prob
+        self.stretch_prob = stretch_prob
+        self.max_stretch = max_stretch
 
         # flip augmentation params
         self.do_flip = do_flip
-        self.h_flip_prob = 0.5
-        self.v_flip_prob = 0.1
+        self.h_flip_prob = h_flip_prob
+        self.v_flip_prob = v_flip_prob
+
+        #noise augmentation params
+        self.noise_aug_prob = noise_aug_prob
+        self.noise_sigma_range = noise_sigma_range
 
         # photometric augmentation params
-        self.photo_aug = Compose([ColorJitter(brightness=0.3, contrast=0.3, saturation=saturation_range, hue=0.3/3.14), AdjustGamma(*gamma)])
-        self.asymmetric_color_aug_prob = 0.2
-        self.eraser_aug_prob = 0.5
+        self.photo_aug = Compose([ColorJitter(brightness=brightness_range, contrast=contrast_range, saturation=saturation_range, hue=hue_range), AdjustGamma(*gamma)])
+        self.asymmetric_color_aug_prob = asymmetric_color_aug_prob
+        self.eraser_aug_prob = eraser_aug_prob
         
     def color_transform(self, img1, img2):
         image_stack = np.concatenate([img1, img2], axis=0)
@@ -270,19 +293,8 @@ class SparseFlowAugmentor:
 
     def spatial_transform(self, img1, img2, flow, valid):
         # randomly sample scale
-
+        '''
         ht, wd = img1.shape[:2]
-
-        if max(ht, wd) > 2.0 * max(self.crop_size):  # when the input image resolution is too high, downsample it by a certain ratio first.
-            pre_scale = (max(self.crop_size) * 1.5) / max(ht, wd)  
-            img1 = cv2.resize(img1, None, fx=pre_scale, fy=pre_scale, interpolation=cv2.INTER_LINEAR)
-            img2 = cv2.resize(img2, None, fx=pre_scale, fy=pre_scale, interpolation=cv2.INTER_LINEAR)
-            flow = cv2.resize(flow, None, fx=pre_scale, fy=pre_scale, interpolation=cv2.INTER_LINEAR)
-            flow = flow * [pre_scale, pre_scale]
-
-            # update ht, wd
-            ht, wd = img1.shape[:2]
-
         min_scale = np.maximum(
             (self.crop_size[0] + 1) / float(ht), 
             (self.crop_size[1] + 1) / float(wd))
@@ -296,32 +308,36 @@ class SparseFlowAugmentor:
             img1 = cv2.resize(img1, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             img2 = cv2.resize(img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             flow, valid = self.resize_sparse_flow_map(flow, valid, fx=scale_x, fy=scale_y)
-
+        '''
         if self.do_flip:
-            if np.random.rand() < self.h_flip_prob and self.do_flip == 'hf': # h-flip
+            if 'h' in self.do_flip and np.random.rand() < self.h_flip_prob: # h-flip
                 img1 = img1[:, ::-1]
                 img2 = img2[:, ::-1]
-                flow = flow[:, ::-1] * [-1.0, 1.0]
-
-            if np.random.rand() < self.h_flip_prob and self.do_flip == 'h': # h-flip for stereo
-                tmp = img1[:, ::-1]
-                img1 = img2[:, ::-1]
+                tmp = img1
+                img1 = img2
                 img2 = tmp
+                flow = flow[:, ::-1]
+                valid = valid[:, ::-1]
 
-            if np.random.rand() < self.v_flip_prob and self.do_flip == 'v': # v-flip
+            if 'v' in self.do_flip and np.random.rand() < self.v_flip_prob: # v-flip
                 img1 = img1[::-1, :]
                 img2 = img2[::-1, :]
                 flow = flow[::-1, :] * [1.0, -1.0]
+                valid = valid[::-1, :]
 
+        '''
         margin_y = 20
         margin_x = 50
 
         y0 = np.random.randint(0, img1.shape[0] - self.crop_size[0] + margin_y)
         x0 = np.random.randint(-margin_x, img1.shape[1] - self.crop_size[1] + margin_x)
-
+        
         y0 = np.clip(y0, 0, img1.shape[0] - self.crop_size[0])
         x0 = np.clip(x0, 0, img1.shape[1] - self.crop_size[1])
-
+        '''
+        possible_y_starts = list(range(0, img1.shape[0] - self.crop_size[0] + 1, self.crop_size[0]))
+        y0 = np.random.choice(possible_y_starts)
+        x0 = 0
         img1 = img1[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
         img2 = img2[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
         flow = flow[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
@@ -329,10 +345,19 @@ class SparseFlowAugmentor:
         
         return img1, img2, flow, valid
 
+    def noise_transform(self, img1, img2):
+        if np.random.rand() < self.noise_aug_prob:
+            sigma = np.random.uniform(self.noise_sigma_range[0], self.noise_sigma_range[1])
+            noise = np.random.normal(0, sigma, img1.shape).astype(np.float32)
+            img1 = np.clip(img1 + noise, 0, 255)
+            img2 = np.clip(img2 + noise, 0, 255)
+        return img1, img2
+
 
     def __call__(self, img1, img2, flow, valid):
         img1, img2 = self.color_transform(img1, img2)
-        img1, img2 = self.eraser_transform(img1, img2)
+        img1, img2 = self.noise_transform(img1, img2)
+        #img1, img2 = self.eraser_transform(img1, img2)
         img1, img2, flow, valid = self.spatial_transform(img1, img2, flow, valid)
 
         img1 = np.ascontiguousarray(img1)
@@ -342,7 +367,6 @@ class SparseFlowAugmentor:
 
         return img1, img2, flow, valid
 
-    
 # def PinholeEulerAnglesToRotationMatrix(theta):
 #     R_x = np.array([[1, 0, 0],
 #                     [0, math.cos(theta[0]), -math.sin(theta[0])],
