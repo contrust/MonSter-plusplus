@@ -15,8 +15,6 @@ import Imath
 import math
 import h5py
 import torch
-from pytorch3d.utils import opencv_from_cameras_projection
-from pytorch3d.renderer.cameras import PerspectiveCameras
 
 def exr2hdr(exrpath):
     File = OpenEXR.InputFile(exrpath)
@@ -336,84 +334,6 @@ def readDispStereoBlur(file_name):
     disp[~valid] = 0
     # print(f'disp max: {disp[valid].max()}, disp min: {disp[valid].min()}')
     return disp.astype(np.float32), valid
-
-
-def readDispDynamicReplica(filename, viewpoint, metadata):
-    with Image.open(filename) as depth_pil:
-        # the image is stored with 16-bit depth but PIL reads it as I (32 bit).
-        # we cast it to uint16, then reinterpret as float16, then cast to float32
-        depth = (
-            np.frombuffer(np.array(depth_pil, dtype=np.uint16), dtype=np.float16)
-            .astype(np.float32)
-            .reshape((depth_pil.size[1], depth_pil.size[0]))
-        )
-    
-    valid = depth > 1e-5
-
-    viewpoint_left = get_pytorch3d_camera(viewpoint[0], metadata[0][1], scale=1.0)
-    viewpoint_right = get_pytorch3d_camera(viewpoint[1], metadata[1][1], scale=1.0)
-    depth2disp_scale = depth2disparity_scale(viewpoint_left, viewpoint_right, torch.Tensor(metadata[0][1])[None])
-
-    disp = np.zeros_like(depth)
-    disp[valid] = depth2disp_scale / depth[valid]
-    disp[~valid] = 0.0
-
-    return disp, valid
-
-def get_pytorch3d_camera(entry_viewpoint, image_size, scale: float) -> PerspectiveCameras:
-    assert entry_viewpoint is not None
-    # principal point and focal length
-    principal_point = torch.tensor(entry_viewpoint.principal_point, dtype=torch.float)
-    focal_length = torch.tensor(entry_viewpoint.focal_length, dtype=torch.float)
-    half_image_size_wh_orig = (torch.tensor(list(reversed(image_size)), dtype=torch.float) / 2.0)
-
-    # first, we convert from the dataset's NDC convention to pixels
-    format = entry_viewpoint.intrinsics_format
-    if format.lower() == "ndc_norm_image_bounds":
-        # this is e.g. currently used in CO3D for storing intrinsics
-        rescale = half_image_size_wh_orig
-    elif format.lower() == "ndc_isotropic":
-        rescale = half_image_size_wh_orig.min()
-    else:
-        raise ValueError(f"Unknown intrinsics format: {format}")
-
-    # principal point and focal length in pixels
-    principal_point_px = half_image_size_wh_orig - principal_point * rescale
-    focal_length_px = focal_length * rescale
-
-    # now, convert from pixels to PyTorch3D v0.5+ NDC convention
-    # if self.image_height is None or self.image_width is None:
-    out_size = list(reversed(image_size))
-
-    half_image_size_output = torch.tensor(out_size, dtype=torch.float) / 2.0
-    half_min_image_size_output = half_image_size_output.min()
-
-    # rescaled principal point and focal length in ndc
-    principal_point = (half_image_size_output - principal_point_px * scale) / half_min_image_size_output
-    focal_length = focal_length_px * scale / half_min_image_size_output
-
-    return PerspectiveCameras(
-        focal_length=focal_length[None],
-        principal_point=principal_point[None],
-        R=torch.tensor(entry_viewpoint.R, dtype=torch.float)[None],
-        T=torch.tensor(entry_viewpoint.T, dtype=torch.float)[None],
-    )
-
-def depth2disparity_scale(left_camera, right_camera, image_size_tensor):
-    # # opencv camera matrices
-    (_, T1, K1), (_, T2, _) = [
-        opencv_from_cameras_projection(
-            f,
-            image_size_tensor,
-        )
-        for f in (left_camera, right_camera)
-    ]
-
-    fix_baseline = T1[0][0] - T2[0][0]
-    focal_length_px = K1[0][0][0]
-    # following this https://github.com/princeton-vl/RAFT-Stereo#converting-disparity-to-depth
-
-    return focal_length_px * fix_baseline
 
 
 def writeFlowKITTI(filename, uv):

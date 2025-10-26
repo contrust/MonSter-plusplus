@@ -17,10 +17,6 @@ from collections import defaultdict
 from typing import List, Optional
 from dataclasses import dataclass
 import cv2
-from pytorch3d.implicitron.dataset.types import (
-    FrameAnnotation as ImplicitronFrameAnnotation,
-    load_dataclass
-)
 
 import sys
 sys.path.append(os.getcwd())
@@ -29,14 +25,6 @@ from core.utils import frame_utils
 from core.utils.augmentor import FlowAugmentor, SparseFlowAugmentor
 
 from typing import List, Tuple, Dict
-
-
-@dataclass
-class DynamicReplicaFrameAnnotation(ImplicitronFrameAnnotation):
-    """A dataclass used to load annotations from json."""
-
-    camera_name: Optional[str] = None
-
 
 
 class StereoDataset(data.Dataset):
@@ -537,43 +525,6 @@ class ThreeDKenBurns(StereoDataset):
             self.image_list += [[img1, img2]]
             self.disparity_list += [disp1]
 
-
-class DynamicReplica(StereoDataset):
-    def __init__(self, aug_params=None, root='./dynamic_replica_data', split='train'):
-        super(DynamicReplica, self).__init__(aug_params, reader=frame_utils.readDispDynamicReplica)
-        assert os.path.exists(root)
-
-        frame_annotations_file = f'frame_annotations_{split}.jgz'
-        with gzip.open(osp.join(root, split, frame_annotations_file), 'rt', encoding='utf8') as zipfile:
-            frame_annots_list = load_dataclass(zipfile, List[DynamicReplicaFrameAnnotation])
-
-        seq_annot = defaultdict(lambda: defaultdict(list))
-        for frame_annot in frame_annots_list:
-            seq_annot[frame_annot.sequence_name][frame_annot.camera_name].append(frame_annot)
-
-        for seq_name in seq_annot.keys():
-
-            image1_list, image2_list, disp_list = [], [], []
-            viewpoint1_list, viewpoint2_list = [], []
-            metadata1_list, metadata2_list = [], []
-            for cam in ['left', 'right']:
-                for frame_data in seq_annot[seq_name][cam]:
-                    if cam == 'left':
-                        image1_list.append(osp.join(root, split, frame_data.image.path))
-                        disp_list.append(osp.join(root, split, frame_data.depth.path))
-                        viewpoint1_list.append(frame_data.viewpoint)
-                        metadata1_list.append([frame_data.sequence_name, frame_data.image.size])
-                    else:
-                        image2_list.append(osp.join(root, split, frame_data.image.path))
-                        viewpoint2_list.append(frame_data.viewpoint)
-                        metadata2_list.append([frame_data.sequence_name, frame_data.image.size])
-            assert len(image1_list) == len(image2_list) == len(disp_list)
-            for idx, (img1, img2, disp, view1, view2, meta1, meta2) in enumerate(zip(image1_list, image2_list, disp_list, viewpoint1_list, viewpoint2_list, metadata1_list, metadata2_list)):
-                self.image_list += [ [img1, img2] ]
-                self.disparity_list += [ disp ]
-                self.viewpoint_list += [ [view1, view2] ]
-                self.metadata_list += [ [meta1, meta2] ]
-
 class VA(StereoDataset):
     def __init__(self, aug_params=None, root='./VA'):
         super().__init__(aug_params, reader=frame_utils.readDispVA)
@@ -736,8 +687,6 @@ def fetch_dataloader(args):
             logging.info(f"Adding {len(booster)} samples from Booster Dataset")
             # irs = IRS(aug_params)
             # logging.info(f"Adding {len(irs)} samples from IRS Dataset")
-            # dynamicstereo = DynamicReplica(aug_params)
-            # logging.info(f"Adding {len(dynamicstereo)} samples from DynamicStereo Dataset")
             # threedkenburns = ThreeDKenBurns(aug_params)
             # logging.info(f"Adding {len(threedkenburns)} samples from ThreeDKenBurns Dataset")
             # fsd = FoundationStereoDataset(aug_params)
@@ -751,8 +700,6 @@ def fetch_dataloader(args):
             logging.info(f"Adding {len(booster)} samples from Booster Dataset")
             irs = IRS(aug_params)
             logging.info(f"Adding {len(irs)} samples from IRS Dataset")
-            dynamicstereo = DynamicReplica(aug_params)
-            logging.info(f"Adding {len(dynamicstereo)} samples from DynamicStereo Dataset")
             threedkenburns = ThreeDKenBurns(aug_params)
             logging.info(f"Adding {len(threedkenburns)} samples from ThreeDKenBurns Dataset")
             spring = Spring(aug_params)
@@ -781,7 +728,7 @@ def fetch_dataloader(args):
             logging.info(f"Adding {len(unrealstereo)} samples from UnrealStereo4K")
             simsin = SimSIN(aug_params)
             logging.info(f"Adding {len(simsin)} samples from SimSIN")
-            new_dataset = fsd + tartanair + crestereo + threedkenburns + irs + dynamicstereo + fallingthings + sceneflow + vkitti2 * 4 + spring * 4 + va * 10 + sintel * 10 + instereo2k * 40 + booster * 60 + carla * 100 + stereoblur * 2 + simsin + unrealstereo * 10
+            new_dataset = fsd + tartanair + crestereo + threedkenburns + irs + fallingthings + sceneflow + vkitti2 * 4 + spring * 4 + va * 10 + sintel * 10 + instereo2k * 40 + booster * 60 + carla * 100 + stereoblur * 2 + simsin + unrealstereo * 10
             logging.info(f"Total {len(new_dataset)} samples from mix datasets")
         elif dataset_name == 'us3d':
             new_dataset = US3D(aug_params)
