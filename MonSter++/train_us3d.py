@@ -30,40 +30,36 @@ def gray_2_colormap_np(img, max_disp=None):
     # Initialize output colormap
     colormap = np.zeros((*img.shape, 3), dtype=np.uint8)
     
-    # Mask for -999 values (set to black)
-    mask_invalid = (img == -999)
+    # Mask for -900 values (set to black)
+    mask_invalid = (img > -900)
     
     # Separate handling for negatives and positives
     neg_mask = (img < 0) & ~mask_invalid
     pos_mask = (img > 0) & ~mask_invalid
     
     if neg_mask.any():
-        # Handle negative values with red gradient colormap
+        # Handle negative values with red colormap
         neg_values = -img[neg_mask]  # Make positive for scaling
         neg_max = neg_values.max() if max_disp is None else max_disp
         neg_norm = neg_values / (neg_max + 1e-8)
         neg_norm = np.clip(neg_norm, 0, 1)
         
-        # Red gradient (Reds colormap)
-        reds_cmap = matplotlib.cm.get_cmap('Reds')
-        reds_norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
-        reds_mapper = matplotlib.cm.ScalarMappable(norm=reds_norm, cmap=reds_cmap)
-        neg_colors = (reds_mapper.to_rgba(neg_norm)[:, :3] * 255).astype(np.uint8)
-        colormap[neg_mask] = neg_colors
+        # Red colormap for negatives (red channel increases with magnitude)
+        colormap[neg_mask, 0] = (neg_norm * 255).astype(np.uint8)  # Red
+        colormap[neg_mask, 1] = 0  # Green
+        colormap[neg_mask, 2] = 0  # Blue
     
     if pos_mask.any():
-        # Handle positive values with blue gradient colormap
+        # Handle positive values with blue colormap
         pos_values = img[pos_mask]
         pos_max = pos_values.max() if max_disp is None else max_disp
         pos_norm = pos_values / (pos_max + 1e-8)
         pos_norm = np.clip(pos_norm, 0, 1)
         
-        # Blue gradient (Blues colormap)
-        blues_cmap = matplotlib.cm.get_cmap('Blues')
-        blues_norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
-        blues_mapper = matplotlib.cm.ScalarMappable(norm=blues_norm, cmap=blues_cmap)
-        pos_colors = (blues_mapper.to_rgba(pos_norm)[:, :3] * 255).astype(np.uint8)
-        colormap[pos_mask] = pos_colors
+        # Blue colormap for positives (blue channel increases with magnitude)
+        colormap[pos_mask, 0] = 0  # Red
+        colormap[pos_mask, 1] = 0  # Green
+        colormap[pos_mask, 2] = (pos_norm * 255).astype(np.uint8)  # Blue
     
     # Set -999 values to black
     colormap[mask_invalid] = [255, 255, 255]
@@ -77,7 +73,7 @@ def sequence_loss(disp_preds, disp_init_pred, disp_gt, valid, loss_gamma=0.9, ma
     assert n_predictions >= 1
     disp_loss = 0.0
     mag = torch.sum(disp_gt**2, dim=1).sqrt()
-    valid = ((valid >= 0.5) & (mag < max_disp)).unsqueeze(1)
+    valid = ((valid >= 0.5) & (disp_gt > 0) & (mag < max_disp)).unsqueeze(1)
     assert valid.shape == disp_gt.shape, [valid.shape, disp_gt.shape]
     assert not torch.isinf(disp_gt[valid.bool()]).any()
 
