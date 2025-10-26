@@ -30,8 +30,8 @@ def gray_2_colormap_np(img, max_disp=None):
     # Initialize output colormap
     colormap = np.zeros((*img.shape, 3), dtype=np.uint8)
     
-    # Mask for -900 values (set to black)
-    mask_invalid = (img > -900)
+    # Mask for -900 values
+    mask_invalid = (img < -900)
     
     # Separate handling for negatives and positives
     neg_mask = (img < 0) & ~mask_invalid
