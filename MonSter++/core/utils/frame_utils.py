@@ -157,6 +157,10 @@ def writeFlow(filename,uv,v=None):
     tmp.astype(np.float32).tofile(f)
     f.close()
 
+def readDispUS3D(file_name):
+    disp = np.array(Image.open(file_name), dtype=np.float32)
+    valid = disp > 0
+    return disp, valid
 
 def readFlowKITTI(filename):
     flow = cv2.imread(filename, cv2.IMREAD_ANYDEPTH|cv2.IMREAD_COLOR)
