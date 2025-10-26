@@ -160,6 +160,24 @@ class StereoDataset(data.Dataset):
     def __len__(self):
         return len(self.image_list)
 
+class US3D(StereoDataset):
+    def __init__(self, aug_params=None, root='datasets/us3d', image_set='images', disp_set='disp'):
+        super(US3D, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispUS3D)
+        self.root = root
+        self.image_set = image_set
+        self.disp_set = disp_set
+        image_set_path = osp.join(root, image_set)
+        disp_set_path = osp.join(root, disp_set)
+        assert os.path.exists(root)
+        assert os.path.exists(image_set_path)
+        assert os.path.exists(disp_set_path)
+        image1_list = sorted(glob(osp.join(image_set_path, '*LEFT*.tif')))
+        image2_list = sorted(glob(osp.join(image_set_path, '*RIGHT*.tif')))
+        disp_list = sorted(glob(osp.join(disp_set_path, '*DSP*.tif')))
+        assert len(image1_list) == len(image2_list) == len(disp_list)
+        for img1, img2, disp in zip(image1_list, image2_list, disp_list):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ disp ]
 
 class SceneFlowDatasets(StereoDataset):
     def __init__(self, aug_params=None, root='/data/StereoData/sceneflow', dstype='frames_finalpass', things_test=False):
@@ -765,6 +783,9 @@ def fetch_dataloader(args):
             logging.info(f"Adding {len(simsin)} samples from SimSIN")
             new_dataset = fsd + tartanair + crestereo + threedkenburns + irs + dynamicstereo + fallingthings + sceneflow + vkitti2 * 4 + spring * 4 + va * 10 + sintel * 10 + instereo2k * 40 + booster * 60 + carla * 100 + stereoblur * 2 + simsin + unrealstereo * 10
             logging.info(f"Total {len(new_dataset)} samples from mix datasets")
+        elif dataset_name == 'us3d':
+            new_dataset = US3D(aug_params)
+            logging.info(f"Adding {len(new_dataset)} samples from US3D")
         train_dataset = new_dataset if train_dataset is None else train_dataset + new_dataset
 
     return train_dataset
