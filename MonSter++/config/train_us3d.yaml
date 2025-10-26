@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-no-aug-val-fix
+project_name: monster-us3d-no-aug-val-fix3
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 encoder: 'vitl'
