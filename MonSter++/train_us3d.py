@@ -212,9 +212,22 @@ def main(cfg):
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
+                with accelerator.autocast():
+                    disp_init_pred_reversed, disp_preds_reversed, depth_mono_reversed = model(right, left, iters=cfg.train_iters)
+
+                loss_reversed, metrics_reversed = sequence_loss(disp_preds_reversed, disp_init_pred_reversed, -disp_gt, valid, max_disp=cfg.max_disp)
+                accelerator.backward(loss_reversed)
+                accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
+
+
                 total_step += 1
                 loss_val = accelerator.reduce(loss.detach(), reduction='mean')
+                loss_reversed_val = accelerator.reduce(loss_reversed.detach(), reduction='mean')
                 metrics = accelerator.reduce(metrics, reduction='mean')
+                metrics_reversed = accelerator.reduce(metrics_reversed, reduction='mean')
                 accelerator.log({'train/loss': loss_val, 'train/learning_rate': optimizer.param_groups[0]['lr']}, total_step)
                 accelerator.log(metrics, total_step)
 
@@ -229,15 +242,18 @@ def main(cfg):
 
                         depth_mono_np = gray_2_colormap_np(depth_mono[0].squeeze())
                         disp_preds_np = gray_2_colormap_np(disp_preds[-1][0].squeeze())
+                        disp_preds_reversed_np = gray_2_colormap_np(disp_preds_reversed[-1][0].squeeze())
+                        disp_preds_diff_np = gray_2_colormap_np((disp_preds[-1][0] - disp_preds_reversed[-1][0]).squeeze())
                         disp_gt_np = gray_2_colormap_np(disp_gt[0].squeeze())
                         tracker = accelerator.get_tracker('tensorboard')
                         writer = tracker.writer
-                        writer.add_image("train/left", image1_np, total_step, dataformats='CHW')
+                        writer.add_image("train/left", image1_np, total_step, dataformats='CHW') 
                         writer.add_image("train/disp_pred", disp_preds_np, total_step, dataformats='HWC')
+                        writer.add_image("train/disp_pred_reversed", disp_preds_reversed_np, total_step, dataformats='HWC')
+                        writer.add_image("train/disp_pred_diff", disp_preds_diff_np, total_step, dataformats='HWC')
                         writer.add_image("train/disp_gt", disp_gt_np, total_step, dataformats='HWC')
                         writer.add_image("train/depth_mono", depth_mono_np, total_step, dataformats='HWC')
-                    accelerator.wait_for_everyone()
-
+                    accelerator.wait_for_everyone()  
 
                 if (total_step > 0) and (total_step % cfg.save_frequency == 0):
                     if accelerator.is_main_process:
@@ -264,9 +280,12 @@ def main(cfg):
                         left, right = padder.pad(left, right)
                         with torch.no_grad():
                             disp_pred = model(left, right, iters=cfg.valid_iters, test_mode=True)
+                            disp_pred_reversed = model(right, left, iters=cfg.valid_iters, test_mode=True)
                         disp_pred = padder.unpad(disp_pred)
+                        disp_pred_reversed = padder.unpad(disp_pred_reversed)
                         assert disp_pred.shape == disp_gt.shape, (disp_pred.shape, disp_gt.shape)
-                        epe = torch.abs(disp_pred - disp_gt)
+                        assert disp_pred_reversed.shape == disp_gt.shape, (disp_pred_reversed.shape, disp_gt.shape)
+                        epe = torch.abs((disp_pred - disp_pred_reversed) - disp_gt)
                         out1 = (epe > 1.0).float()
                         out2 = (epe > 2.0).float()
                         out3 = (epe > 3.0).float()
@@ -299,14 +318,18 @@ def main(cfg):
                                 image1_np = image1_np.astype(np.uint8)
 
                                 disp_pred_np = gray_2_colormap_np(disp_pred[0].squeeze())
+                                disp_pred_reversed_np = gray_2_colormap_np(disp_pred_reversed[0].squeeze())
+                                disp_pred_diff_np = gray_2_colormap_np((disp_pred[0] - disp_pred_reversed[0]).squeeze())
                                 disp_gt_np = gray_2_colormap_np(disp_gt[0].squeeze())
 
                                 tracker = accelerator.get_tracker('tensorboard')
                                 writer = tracker.writer
 
-                                writer.add_image("val/left", image1_np, val_step, dataformats='CHW')
-                                writer.add_image("val/disp_pred", disp_pred_np, val_step, dataformats='HWC')
-                                writer.add_image("val/disp_gt", disp_gt_np, val_step, dataformats='HWC')
+                                writer.add_image("val/left", image1_np, total_step, dataformats='CHW')
+                                writer.add_image("val/disp_pred", disp_pred_np, total_step, dataformats='HWC')
+                                writer.add_image("val/disp_pred_reversed", disp_pred_reversed_np, total_step, dataformats='HWC')
+                                writer.add_image("val/disp_pred_diff", disp_pred_diff_np, total_step, dataformats='HWC')
+                                writer.add_image("val/disp_gt", disp_gt_np, total_step, dataformats='HWC')
                             accelerator.wait_for_everyone()
 
                     if accelerator.is_main_process:
@@ -315,7 +338,7 @@ def main(cfg):
                                             'val/d2': 100 * total_out2 / elem_num,
                                             'val/d3': 100 * total_out3 / elem_num,
                                             'val/d4': 100 * total_out4 / elem_num,
-                                            'val/d5': 100 * total_out5 / elem_num}, val_step)
+                                            'val/d5': 100 * total_out5 / elem_num}, total_step)
 
                     model.train()
                     model.module.freeze_bn()
