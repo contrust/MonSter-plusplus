@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-no-aug-val-infrequent
+project_name: monster-us3d-pred-diff3
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 encoder: 'vitl'
@@ -14,7 +14,7 @@ current_val_step: 0
 total_step: 31000
 save_frequency: 7500
 save_path: ./checkpoints/us3d/
-train_image_frequency: 50
+train_image_frequency: 25
 val_image_frequency: 25
 val_frequency: 750
 image_size: [256, 1024]
