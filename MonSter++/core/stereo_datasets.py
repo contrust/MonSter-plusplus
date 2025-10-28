@@ -595,18 +595,19 @@ class StereoBlur(StereoDataset):
             self.disparity_list += [disp1]
         # self.clear_img_list = [[img1.replace("/image_left/", "/image_left_blur_ga/"), img2.replace("/image_right/", "/image_right_blur_ga/")] for img1, img2 in self.image_list]
 
-def fetch_dataloader(args):
+def fetch_dataloader(args, use_augmentation=True):
     """ Create the data loader for the corresponding trainign set """
     # print('args.img_gamma', args.img_gamma)
-    aug_params = {'crop_size': list(args.image_size), 'min_scale': args.spatial_scale[0], 'max_scale': args.spatial_scale[1], 'do_flip': False, 'yjitter': not args.noyjitter}
-    if hasattr(args, "saturation_range") and args.saturation_range is not None:
-        aug_params["saturation_range"] = list(args.saturation_range)
-    if hasattr(args, "img_gamma") and args.img_gamma is not None:
-        aug_params["gamma"] = args.img_gamma
-    if hasattr(args, "do_flip") and args.do_flip is not None:
-        aug_params["do_flip"] = args.do_flip
-
-
+    if use_augmentation:
+        aug_params = {'crop_size': list(args.image_size), 'min_scale': args.spatial_scale[0], 'max_scale': args.spatial_scale[1], 'do_flip': False, 'yjitter': not args.noyjitter}
+        if hasattr(args, "saturation_range") and args.saturation_range is not None:
+            aug_params["saturation_range"] = list(args.saturation_range)
+        if hasattr(args, "img_gamma") and args.img_gamma is not None:
+            aug_params["gamma"] = args.img_gamma
+        if hasattr(args, "do_flip") and args.do_flip is not None:
+            aug_params["do_flip"] = args.do_flip
+    else:
+        aug_params = {}
 
     train_dataset = None
     print('train_datasets', args.train_datasets)
