@@ -1,6 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,pythonvanilla,jupyternotebooks,visualstudiocode,vim
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pythonvanilla,jupyternotebooks,visualstudiocode,vim
 
+datasets/
 checkpoints/
 pretrained/
 logs/
