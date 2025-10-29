@@ -19,6 +19,7 @@ TRAIN_RATIO = 0.8
 VAL_RATIO = 0.1
 TEST_RATIO = 0.1
 TRAIN_CROP_SIZE = (256, 1024)
+SPLIT_INFO_BASENAME = "split_info.txt"
 
 def get_cropped_array_list_by_size(arr: np.ndarray, size: Tuple[int, int]) -> Optional[List[np.ndarray]]:
     arr_h, arr_w = arr.shape[:2]
@@ -124,8 +125,8 @@ def main():
         shutil.copy(image_right_path, os.path.join(DEST_TEST_DIR, os.path.basename(image_right_path)))
         shutil.copy(disp_path, os.path.join(DEST_TEST_DIR, os.path.basename(disp_path)))
     print("Done")
-    print("Saving split information to split_info.txt...")
-    with open(os.path.join(DEST_ROOT, "split_info.txt"), "w") as f:
+    print("Saving the split information to the split info file...")
+    with open(os.path.join(DEST_ROOT, SPLIT_INFO_BASENAME), "w") as f:
         f.write(f"Train ratio: {TRAIN_RATIO}\n")
         f.write(f"Val ratio: {VAL_RATIO}\n")
         f.write(f"Test ratio: {TEST_RATIO}\n")
