@@ -89,7 +89,9 @@ def main():
     print(f"Found {len(image_left_list)} images")
     print("Splitting data into train, val, and test sets...")
     data_list = list(zip(image_left_list, image_right_list, disp_list))
-    train_list, val_list, test_list = random_split(data_list, [TRAIN_RATIO, VAL_RATIO, TEST_RATIO])
+    train_list = list(filter(lambda x: x[0].split("/")[-1].startswith("JAX"), data_list))
+    val_list = list(filter(lambda x: x[0].split("/")[-1].startswith("OMA"), data_list))
+    test_list = []
     print("Done")
     print("--------------------------------")
     print(f"Train split: {TRAIN_RATIO}, {len(train_list)} train images")
