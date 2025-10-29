@@ -96,7 +96,7 @@ def main():
     print(f"Val split: {VAL_RATIO}, {len(val_list)} val images")
     print(f"Test split: {TEST_RATIO}, {len(test_list)} test images")
     print("--------------------------------")
-    print("Cropping train images and saving to train directory...")
+    print("Cropping the train images and saving to the train directory...")
     for (image_left_path, image_right_path, disp_path) in tqdm(train_list, desc="train", unit="image"):
         image_left = Image.open(image_left_path)
         image_right = Image.open(image_right_path)
@@ -113,13 +113,13 @@ def main():
                 Image.fromarray(cropped_right_image).convert("RGB").save(right_image_path)
                 Image.fromarray(cropped_disp_image).convert("F").save(disp_image_path)
     print("Done")
-    print("Saving val images to val directory...")
+    print("Saving the val images to the val directory...")
     for (image_left_path, image_right_path, disp_path) in tqdm(val_list, desc="val", unit="image"):
         shutil.copy(image_left_path, os.path.join(DEST_VAL_DIR, os.path.basename(image_left_path)))
         shutil.copy(image_right_path, os.path.join(DEST_VAL_DIR, os.path.basename(image_right_path)))
         shutil.copy(disp_path, os.path.join(DEST_VAL_DIR, os.path.basename(disp_path)))
     print("Done")
-    print("Saving test images to test directory...")
+    print("Saving the test images to the test directory...")
     for (image_left_path, image_right_path, disp_path) in tqdm(test_list, desc="test", unit="image"):
         shutil.copy(image_left_path, os.path.join(DEST_TEST_DIR, os.path.basename(image_left_path)))
         shutil.copy(image_right_path, os.path.join(DEST_TEST_DIR, os.path.basename(image_right_path)))
