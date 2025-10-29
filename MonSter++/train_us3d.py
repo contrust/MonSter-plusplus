@@ -149,12 +149,15 @@ def main(cfg):
     
     accelerator.init_trackers(project_name=cfg.project_name, config=hparams_config, init_kwargs={'tensorboard': cfg.tensorboard})
 
-    dataset = datasets.fetch_dataloader(cfg)
-    train_dataset, val_dataset, _ = torch.utils.data.random_split(dataset, [cfg.train_split_ratio, cfg.val_split_ratio, 1 - cfg.train_split_ratio - cfg.val_split_ratio])
+    train_dataset = datasets.fetch_dataloader(cfg)
+    val_dataset = datasets.US3D(aug_params=None, split='val')
+    test_dataset = datasets.US3D(aug_params=None, split='test')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=cfg.batch_size,
         pin_memory=True, shuffle=True, num_workers=1, drop_last=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,
-        pin_memory=True, shuffle=False, num_workers=1, drop_last=False)
+        pin_memory=True, shuffle=False, num_workers=int(4), drop_last=False)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=cfg.batch_size,
+        pin_memory=True, shuffle=False, num_workers=int(4), drop_last=False)
 
     model = Monster(cfg)
     optimizer, lr_scheduler = fetch_optimizer(cfg, model)
@@ -166,6 +169,7 @@ def main(cfg):
         checkpoint = torch.load(cfg.restore_ckpt, map_location='cpu')
         ckpt = dict()
         if 'state_dict' in checkpoint.keys():
+            print("Loading checkpoint from state_dict...")
             checkpoint = checkpoint['state_dict']
             for key in checkpoint:
                 if key.startswith("module."):
@@ -175,7 +179,16 @@ def main(cfg):
             model.load_state_dict(ckpt, strict=True)
             total_step = 0
         elif 'model' in checkpoint.keys():
+            print("Loading checkpoint from model...")
             checkpoint = checkpoint['model']
+            for key in checkpoint:
+                if key.startswith("module."):
+                    ckpt[key.replace('module.', '')] = checkpoint[key]
+                else:
+                    ckpt[key] = checkpoint[key]
+            model.load_state_dict(ckpt, strict=True)
+        else:
+            print("Loading checkpoint from raw checkpoint...")
             for key in checkpoint:
                 if key.startswith("module."):
                     ckpt[key.replace('module.', '')] = checkpoint[key]
@@ -189,12 +202,77 @@ def main(cfg):
 
     total_step = cfg.current_total_step
     val_step = cfg.current_val_step
-    train_loader, val_loader, model, optimizer, lr_scheduler = accelerator.prepare(train_loader, val_loader, model, optimizer, lr_scheduler)  #, val_loader  fds, 
+    train_loader, val_loader, test_loader, model, optimizer, lr_scheduler = accelerator.prepare(train_loader, val_loader, test_loader, model, optimizer, lr_scheduler)  #, val_loader  fds, 
     should_keep_training = True
+    epoch = 0
     try:
         while should_keep_training:
-            active_train_loader = train_loader
+            if epoch % cfg.val_frequency == 0:
+                torch.cuda.empty_cache()
+                model.eval()
+                elem_num, total_epe, total_out1, total_out2, total_out3, total_out4, total_out5 = 0, 0, 0, 0, 0, 0, 0
+                for data in tqdm(val_loader, dynamic_ncols=True, disable=not accelerator.is_main_process):
+                    val_step += 1
+                    (imageL_file, imageR_file, GT_file), left, right, disp_gt, valid = [x for x in data]
+                    padder = InputPadder(left.shape, divis_by=32)
+                    left, right = padder.pad(left, right)
+                    with torch.no_grad():
+                        disp_pred = model(left, right, iters=cfg.valid_iters, test_mode=True)
+                    disp_pred = padder.unpad(disp_pred)
+                    assert disp_pred.shape == disp_gt.shape, (disp_pred.shape, disp_gt.shape)
+                    epe = torch.abs(disp_pred - disp_gt)
+                    out1 = (epe > 1.0).float()
+                    out2 = (epe > 2.0).float()
+                    out3 = (epe > 3.0).float()
+                    out4 = (epe > 4.0).float()
+                    out5 = (epe > 5.0).float()
+                    epe = torch.squeeze(epe, dim=1)
+                    out1 = torch.squeeze(out1, dim=1)
+                    out2 = torch.squeeze(out2, dim=1)
+                    out3 = torch.squeeze(out3, dim=1)
+                    out4 = torch.squeeze(out4, dim=1)
+                    out5 = torch.squeeze(out5, dim=1)
+                    epe, out1, out2, out3, out4, out5 = accelerator.gather_for_metrics((epe[valid >= 0.5].mean(),
+                        out1[valid >= 0.5].mean(),
+                        out2[valid >= 0.5].mean(),
+                        out3[valid >= 0.5].mean(),
+                        out4[valid >= 0.5].mean(),
+                        out5[valid >= 0.5].mean()))
+                    elem_num += epe.shape[0]
+                    for i in range(epe.shape[0]):
+                        total_epe += epe[i]
+                        total_out1 += out1[i]
+                        total_out2 += out2[i]
+                        total_out3 += out3[i]
+                        total_out4 += out4[i]
+                        total_out5 += out5[i]
+                    if val_step % cfg.val_image_frequency == 0:
+                        if accelerator.is_main_process:
+                            image1_np = left[0].squeeze().cpu().numpy()
+                            image1_np = (image1_np - image1_np.min()) / (image1_np.max() - image1_np.min()) * 255.0
+                            image1_np = image1_np.astype(np.uint8)
 
+                            disp_pred_np = gray_2_colormap_np(disp_pred[0].squeeze())
+                            disp_gt_np = gray_2_colormap_np(disp_gt[0].squeeze())
+
+                            tracker = accelerator.get_tracker('tensorboard')
+                            writer = tracker.writer
+
+                            writer.add_image("val/left", image1_np, val_step, dataformats='CHW')
+                            writer.add_image("val/disp_pred", disp_pred_np, val_step, dataformats='HWC')
+                            writer.add_image("val/disp_gt", disp_gt_np, val_step, dataformats='HWC')
+                        accelerator.wait_for_everyone()
+
+                if accelerator.is_main_process:
+                    accelerator.log({'val/epe': total_epe / elem_num,
+                                     'val/d1_1px': 100 * total_out1 / elem_num,
+                                     'val/d1_2px': 100 * total_out2 / elem_num,
+                                     'val/d1_3px': 100 * total_out3 / elem_num,
+                                     'val/d1_4px': 100 * total_out4 / elem_num,
+                                     'val/d1_5px': 100 * total_out5 / elem_num}, total_step)
+                accelerator.wait_for_everyone()
+
+            active_train_loader = train_loader
             model.train()
             model.module.freeze_bn()
 
@@ -212,22 +290,10 @@ def main(cfg):
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
-                with accelerator.autocast():
-                    disp_init_pred_reversed, disp_preds_reversed, depth_mono_reversed = model(right, left, iters=cfg.train_iters)
-
-                loss_reversed, metrics_reversed = sequence_loss(disp_preds_reversed, disp_init_pred_reversed, -disp_gt, valid, max_disp=cfg.max_disp)
-                accelerator.backward(loss_reversed)
-                accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.zero_grad()
-
 
                 total_step += 1
                 loss_val = accelerator.reduce(loss.detach(), reduction='mean')
-                loss_reversed_val = accelerator.reduce(loss_reversed.detach(), reduction='mean')
                 metrics = accelerator.reduce(metrics, reduction='mean')
-                metrics_reversed = accelerator.reduce(metrics_reversed, reduction='mean')
                 accelerator.log({'train/loss': loss_val, 'train/learning_rate': optimizer.param_groups[0]['lr']}, total_step)
                 accelerator.log(metrics, total_step)
 
@@ -242,15 +308,11 @@ def main(cfg):
 
                         depth_mono_np = gray_2_colormap_np(depth_mono[0].squeeze())
                         disp_preds_np = gray_2_colormap_np(disp_preds[-1][0].squeeze())
-                        disp_preds_reversed_np = gray_2_colormap_np(disp_preds_reversed[-1][0].squeeze())
-                        disp_preds_diff_np = gray_2_colormap_np((disp_preds[-1][0] - disp_preds_reversed[-1][0]).squeeze())
                         disp_gt_np = gray_2_colormap_np(disp_gt[0].squeeze())
                         tracker = accelerator.get_tracker('tensorboard')
                         writer = tracker.writer
                         writer.add_image("train/left", image1_np, total_step, dataformats='CHW') 
                         writer.add_image("train/disp_pred", disp_preds_np, total_step, dataformats='HWC')
-                        writer.add_image("train/disp_pred_reversed", disp_preds_reversed_np, total_step, dataformats='HWC')
-                        writer.add_image("train/disp_pred_diff", disp_preds_diff_np, total_step, dataformats='HWC')
                         writer.add_image("train/disp_gt", disp_gt_np, total_step, dataformats='HWC')
                         writer.add_image("train/depth_mono", depth_mono_np, total_step, dataformats='HWC')
                     accelerator.wait_for_everyone()  
@@ -268,91 +330,25 @@ def main(cfg):
                         torch.save(checkpoint, save_path)
                         del model_save
 
-
-                if total_step % cfg.val_frequency == 0:
-                    torch.cuda.empty_cache()
-                    model.eval()
-                    elem_num, total_epe, total_out1, total_out2, total_out3, total_out4, total_out5 = 0, 0, 0, 0, 0, 0, 0
-                    for data in tqdm(val_loader, dynamic_ncols=True, disable=not accelerator.is_main_process):
-                        val_step += 1
-                        (imageL_file, imageR_file, GT_file), left, right, disp_gt, valid = [x for x in data]
-                        padder = InputPadder(left.shape, divis_by=32)
-                        left, right = padder.pad(left, right)
-                        with torch.no_grad():
-                            disp_pred = model(left, right, iters=cfg.valid_iters, test_mode=True)
-                            disp_pred_reversed = model(right, left, iters=cfg.valid_iters, test_mode=True)
-                        disp_pred = padder.unpad(disp_pred)
-                        disp_pred_reversed = padder.unpad(disp_pred_reversed)
-                        assert disp_pred.shape == disp_gt.shape, (disp_pred.shape, disp_gt.shape)
-                        assert disp_pred_reversed.shape == disp_gt.shape, (disp_pred_reversed.shape, disp_gt.shape)
-                        epe = torch.abs((disp_pred - disp_pred_reversed) - disp_gt)
-                        out1 = (epe > 1.0).float()
-                        out2 = (epe > 2.0).float()
-                        out3 = (epe > 3.0).float()
-                        out4 = (epe > 4.0).float()
-                        out5 = (epe > 5.0).float()
-                        epe = torch.squeeze(epe, dim=1)
-                        out1 = torch.squeeze(out1, dim=1)
-                        out2 = torch.squeeze(out2, dim=1)
-                        out3 = torch.squeeze(out3, dim=1)
-                        out4 = torch.squeeze(out4, dim=1)
-                        out5 = torch.squeeze(out5, dim=1)
-                        epe, out1, out2, out3, out4, out5 = accelerator.gather_for_metrics((epe[valid >= 0.5].mean(),
-                            out1[valid >= 0.5].mean(),
-                            out2[valid >= 0.5].mean(),
-                            out3[valid >= 0.5].mean(),
-                            out4[valid >= 0.5].mean(),
-                            out5[valid >= 0.5].mean()))
-                        elem_num += epe.shape[0]
-                        for i in range(epe.shape[0]):
-                            total_epe += epe[i]
-                            total_out1 += out1[i]
-                            total_out2 += out2[i]
-                            total_out3 += out3[i]
-                            total_out4 += out4[i]
-                            total_out5 += out5[i]
-                        if val_step % cfg.val_image_frequency == 0:
-                            if accelerator.is_main_process:
-                                image1_np = left[0].squeeze().cpu().numpy()
-                                image1_np = (image1_np - image1_np.min()) / (image1_np.max() - image1_np.min()) * 255.0
-                                image1_np = image1_np.astype(np.uint8)
-
-                                disp_pred_np = gray_2_colormap_np(disp_pred[0].squeeze())
-                                disp_pred_reversed_np = gray_2_colormap_np(disp_pred_reversed[0].squeeze())
-                                disp_pred_diff_np = gray_2_colormap_np((disp_pred[0] - disp_pred_reversed[0]).squeeze())
-                                disp_gt_np = gray_2_colormap_np(disp_gt[0].squeeze())
-
-                                tracker = accelerator.get_tracker('tensorboard')
-                                writer = tracker.writer
-
-                                writer.add_image("val/left", image1_np, total_step, dataformats='CHW')
-                                writer.add_image("val/disp_pred", disp_pred_np, total_step, dataformats='HWC')
-                                writer.add_image("val/disp_pred_reversed", disp_pred_reversed_np, total_step, dataformats='HWC')
-                                writer.add_image("val/disp_pred_diff", disp_pred_diff_np, total_step, dataformats='HWC')
-                                writer.add_image("val/disp_gt", disp_gt_np, total_step, dataformats='HWC')
-                            accelerator.wait_for_everyone()
-
-                    if accelerator.is_main_process:
-                        accelerator.log({'val/epe': total_epe / elem_num,
-                                            'val/d1': 100 * total_out1 / elem_num,
-                                            'val/d2': 100 * total_out2 / elem_num,
-                                            'val/d3': 100 * total_out3 / elem_num,
-                                            'val/d4': 100 * total_out4 / elem_num,
-                                            'val/d5': 100 * total_out5 / elem_num}, total_step)
-
-                    model.train()
-                    model.module.freeze_bn()
-
                 if total_step == cfg.total_step:
                     should_keep_training = False
                     break
+                
+            epoch += 1
+
 
         if accelerator.is_main_process:
             save_path = Path(cfg.save_path + f'/{cfg.project_name}_{total_step}.pth')
             model_save = accelerator.unwrap_model(model)
-            torch.save(model_save.state_dict(), save_path)
+            checkpoint = {
+                'model': model_save.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'total_step': total_step,
+                'scheduler': lr_scheduler.state_dict()
+            }
+            torch.save(checkpoint, save_path)
             del model_save
-        
+  
         accelerator.end_training()
     finally:
         if dist.is_initialized():
