@@ -96,11 +96,11 @@ def sequence_loss(disp_preds, disp_init_pred, disp_gt, valid, loss_gamma=0.9, ma
 
     metrics = {
         'train/epe': epe.mean(),
-        'train/1px': (epe < 1).float().mean(),
-        'train/2px': (epe < 2).float().mean(),
-        'train/3px': (epe < 3).float().mean(),
-        'train/4px': (epe < 4).float().mean(),
-        'train/5px': (epe < 5).float().mean(),
+        'train/d1_1px': (epe > 1).float().mean() * 100,
+        'train/d1_2px': (epe > 2).float().mean() * 100,
+        'train/d1_3px': (epe > 3).float().mean() * 100,
+        'train/d1_4px': (epe > 4).float().mean() * 100,
+        'train/d1_5px': (epe > 5).float().mean() * 100,
     }
     return disp_loss, metrics
 
