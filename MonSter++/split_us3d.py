@@ -110,7 +110,7 @@ def main():
                 disp_image_path = os.path.join(DEST_TRAIN_DIR, add_suffix_before_extension(os.path.basename(disp_path), f"_{i}"))
                 Image.fromarray(cropped_left_image).convert("RGB").save(left_image_path)
                 Image.fromarray(cropped_right_image).convert("RGB").save(right_image_path)
-                Image.fromarray(cropped_disp_image).convert("L").save(disp_image_path)
+                Image.fromarray(cropped_disp_image).convert("F").save(disp_image_path)
     print("Done")
     print("Saving val images to val directory...")
     for (image_left_path, image_right_path, disp_path) in tqdm(val_list, desc="val", unit="image"):
