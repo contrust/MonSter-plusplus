@@ -62,19 +62,19 @@ def main():
         if str.lower(answer) != "y":
             print("Exiting...")
             exit(0)
-        os.rmdir(DEST_TRAIN_DIR)
+        shutil.rmtree(DEST_TRAIN_DIR)
     if os.path.exists(DEST_VAL_DIR):
         answer = input("Dest val dir already exists, do you want to continue? (y/n) ")
         if str.lower(answer) != "y":
             print("Exiting...")
             exit(0)
-        os.rmdir(DEST_VAL_DIR)
+        shutil.rmtree(DEST_VAL_DIR)
     if os.path.exists(DEST_TEST_DIR):
         answer = input("Dest test dir already exists, do you want to continue? (y/n) ")
         if str.lower(answer) != "y":
             print("Exiting...")
             exit(0)
-        os.rmdir(DEST_TEST_DIR)
+        shutil.rmtree(DEST_TEST_DIR)
     print("Creating destination directories...")
     os.makedirs(DEST_TRAIN_DIR, exist_ok=True)
     os.makedirs(DEST_VAL_DIR, exist_ok=True)
