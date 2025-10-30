@@ -308,7 +308,7 @@ def main(cfg):
                                      'val/d1_5px': 100 * d1_5px}, epoch)
                 accelerator.wait_for_everyone()
 
-                if d1_early_stopper(d1_1px) or epe_early_stopper(epe):
+                if d1_early_stopper(d1_1px) and epe_early_stopper(epe):
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
                     break
