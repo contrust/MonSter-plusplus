@@ -176,7 +176,7 @@ def main(cfg):
     val_dataset = datasets.US3D(aug_params=None, split='val')
     test_dataset = datasets.US3D(aug_params=None, split='test')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=cfg.batch_size,
-        pin_memory=True, shuffle=True, num_workers=1, drop_last=True)
+        pin_memory=True, shuffle=True, num_workers=int(1), drop_last=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,
         pin_memory=True, shuffle=False, num_workers=int(4), drop_last=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=cfg.batch_size,
