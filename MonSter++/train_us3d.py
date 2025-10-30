@@ -23,6 +23,29 @@ import torch.distributed as dist
 from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 
+class EarlyStopper:
+    def __init__(self, patience: int, min_delta: float, min_mode: bool) -> None:
+        if patience < 1:
+            raise ValueError("patience must be at least 1")
+        if min_delta < 0:
+            raise ValueError("min_delta must be non-negative")
+        self.patience = patience
+        self.min_delta = min_delta
+        self.last_scores = []
+        self.min_mode = min_mode
+
+    def __call__(self, score: float) -> bool:
+        self.last_scores.append(score)
+        if len(self.last_scores) <= self.patience:
+            return False
+        else:
+            if self.min_mode:
+                should_stop =  self.last_scores[0] < min(self.last_scores[1:]) + self.min_delta
+            else:
+                should_stop = self.last_scores[0] > max(self.last_scores[1:]) - self.min_delta
+            self.last_scores = self.last_scores[1:]
+            return should_stop
+
 def gray_2_colormap_np(img, max_disp=None):
     img = img.cpu().detach().numpy().squeeze()
     assert img.ndim == 2
