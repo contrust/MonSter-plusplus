@@ -33,8 +33,11 @@ class EarlyStopper:
         self.min_delta = min_delta
         self.last_scores = []
         self.min_mode = min_mode
+        self.already_stopped = False
 
     def __call__(self, score: float) -> bool:
+        if self.already_stopped:
+            return True
         self.last_scores.append(score)
         if len(self.last_scores) <= self.patience:
             return False
@@ -44,6 +47,7 @@ class EarlyStopper:
             else:
                 should_stop = self.last_scores[0] > max(self.last_scores[1:]) - self.min_delta
             self.last_scores = self.last_scores[1:]
+            self.already_stopped = should_stop
             return should_stop
 
 def gray_2_colormap_np(img, max_disp=None):
