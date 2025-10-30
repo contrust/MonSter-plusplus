@@ -6,7 +6,7 @@ encoder: 'vitl'
 batch_size: 16
 train_datasets: ['us3d']
 d1_patience: 4
-d1_min_delta: 0.003
+d1_min_delta: 0.0003
 epe_patience: 4
 epe_min_delta: 0.002
 lr: 1e-4
