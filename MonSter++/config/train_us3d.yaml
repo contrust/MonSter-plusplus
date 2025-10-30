@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-jax-train-oma-val-early-stop
+project_name: monster-us3d-jax-train-oma-val-early-stop-min-mode-fix
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 encoder: 'vitl'
