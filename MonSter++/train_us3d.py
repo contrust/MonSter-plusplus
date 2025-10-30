@@ -229,7 +229,7 @@ def main(cfg):
     should_keep_training = True
     epoch = 0
     d1_early_stopper = EarlyStopper(patience=cfg.d1_patience, min_delta=cfg.d1_min_delta, min_mode=True)
-    epe_early_stopper = EarlyStopper(patience=cfg.epe_patience, min_delta=cfg.epe_min_delta, min_mode=False)
+    epe_early_stopper = EarlyStopper(patience=cfg.epe_patience, min_delta=cfg.epe_min_delta, min_mode=True)
     try:
         while should_keep_training:
             if epoch % cfg.val_frequency == 0:
