@@ -306,10 +306,10 @@ def main(cfg):
 
                 if d1_early_stopper(d1_1px) or epe_early_stopper(epe):
                     should_keep_training = False
+                    print(f"Early stopping at epoch {epoch}")
                     break
 
             if not should_keep_training:
-                print(f"Early stopping at epoch {epoch}")
                 break
 
             active_train_loader = train_loader
