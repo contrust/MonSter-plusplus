@@ -228,6 +228,8 @@ def main(cfg):
     train_loader, val_loader, test_loader, model, optimizer, lr_scheduler = accelerator.prepare(train_loader, val_loader, test_loader, model, optimizer, lr_scheduler)  #, val_loader  fds, 
     should_keep_training = True
     epoch = 0
+    d1_early_stopper = EarlyStopper(patience=cfg.d1_patience, min_delta=cfg.d1_min_delta, min_mode=True)
+    epe_early_stopper = EarlyStopper(patience=cfg.epe_patience, min_delta=cfg.epe_min_delta, min_mode=False)
     try:
         while should_keep_training:
             if epoch % cfg.val_frequency == 0:
@@ -285,15 +287,30 @@ def main(cfg):
                             writer.add_image("val/disp_pred", disp_pred_np, val_step, dataformats='HWC')
                             writer.add_image("val/disp_gt", disp_gt_np, val_step, dataformats='HWC')
                         accelerator.wait_for_everyone()
+                    
+                epe = total_epe / elem_num
+                d1_1px = total_out1 / elem_num
+                d1_2px = total_out2 / elem_num
+                d1_3px = total_out3 / elem_num
+                d1_4px = total_out4 / elem_num
+                d1_5px = total_out5 / elem_num
 
                 if accelerator.is_main_process:
-                    accelerator.log({'val/epe': total_epe / elem_num,
-                                     'val/d1_1px': 100 * total_out1 / elem_num,
-                                     'val/d1_2px': 100 * total_out2 / elem_num,
-                                     'val/d1_3px': 100 * total_out3 / elem_num,
-                                     'val/d1_4px': 100 * total_out4 / elem_num,
-                                     'val/d1_5px': 100 * total_out5 / elem_num}, total_step)
+                    accelerator.log({'val/epe': epe,
+                                     'val/d1_1px': 100 * d1_1px,
+                                     'val/d1_2px': 100 * d1_2px,
+                                     'val/d1_3px': 100 * d1_3px,
+                                     'val/d1_4px': 100 * d1_4px,
+                                     'val/d1_5px': 100 * d1_5px}, epoch)
                 accelerator.wait_for_everyone()
+
+                if d1_early_stopper(d1_1px) or epe_early_stopper(epe):
+                    should_keep_training = False
+                    break
+
+            if not should_keep_training:
+                print(f"Early stopping at epoch {epoch}")
+                break
 
             active_train_loader = train_loader
             model.train()
