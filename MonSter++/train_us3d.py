@@ -178,12 +178,9 @@ def main(cfg):
 
     train_dataset = datasets.fetch_dataloader(cfg)
     val_dataset = datasets.US3D(aug_params=None, split='val')
-    test_dataset = datasets.US3D(aug_params=None, split='test')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=cfg.batch_size,
         pin_memory=True, shuffle=True, num_workers=int(1), drop_last=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,
-        pin_memory=True, shuffle=False, num_workers=int(1), drop_last=False)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=cfg.batch_size,
         pin_memory=True, shuffle=False, num_workers=int(1), drop_last=False)
 
     model = Monster(cfg)
@@ -229,7 +226,7 @@ def main(cfg):
 
     total_step = cfg.current_total_step
     val_step = cfg.current_val_step
-    train_loader, val_loader, test_loader, model, optimizer, lr_scheduler = accelerator.prepare(train_loader, val_loader, test_loader, model, optimizer, lr_scheduler)  #, val_loader  fds, 
+    train_loader, val_loader, model, optimizer, lr_scheduler = accelerator.prepare(train_loader, val_loader, model, optimizer, lr_scheduler)
     should_keep_training = True
     epoch = 0
     d1_early_stopper = EarlyStopper(patience=cfg.d1_patience, min_delta=cfg.d1_min_delta, min_mode=True)
