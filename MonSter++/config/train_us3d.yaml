@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-jax-train-oma-val-early-stop-min-mode-fix
+project_name: monster-us3d-baseline2
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 encoder: 'vitl'
@@ -13,11 +13,11 @@ lr: 1e-4
 wdecay: 1e-5
 current_total_step: 0
 current_val_step: 0
-total_step: 36000
-save_frequency: 12000
+total_step: 30000
+save_frequency: 30001
 save_path: ./checkpoints/us3d/
-train_image_frequency: 1000
-val_image_frequency: 50
+train_image_frequency: 500
+val_image_frequency: 5
 val_frequency: 1
 image_size: [256, 1024]
 train_iters: 22
