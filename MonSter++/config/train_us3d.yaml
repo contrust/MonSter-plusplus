@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-baseline2
+project_name: monster-us3d-baseline-max-disp-96
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 encoder: 'vitl'
@@ -28,7 +28,7 @@ corr_radius: 4
 n_downsample: 2
 n_gru_layers: 3
 hidden_dims: [128, 128, 128]
-max_disp: 128
+max_disp: 96
 saturation_range: [1.0, 1.0]
 do_flip: ''
 spatial_scale: [-0.2, 0.0]
