@@ -31,24 +31,19 @@ class EarlyStopper:
             raise ValueError("min_delta must be non-negative")
         self.patience = patience
         self.min_delta = min_delta
-        self.last_scores = []
         self.min_mode = min_mode
-        self.already_stopped = False
+        self.current_epoch = 0
+        self.best_score = float('inf') if min_mode else float('-inf')
+        self.best_epoch = 0
 
-    def __call__(self, score: float) -> bool:
-        if self.already_stopped:
-            return True
-        self.last_scores.append(score)
-        if len(self.last_scores) <= self.patience:
+    def __call__(self, score: float, epoch: int) -> bool:
+        self.current_epoch = epoch
+        is_current_best = score < self.best_score - self.min_delta if self.min_mode else score > self.best_score + self.min_delta
+        if is_current_best:
+            self.best_score = score
+            self.best_epoch = epoch
             return False
-        else:
-            if self.min_mode:
-                should_stop =  self.last_scores[0] < min(self.last_scores[1:]) + self.min_delta
-            else:
-                should_stop = self.last_scores[0] > max(self.last_scores[1:]) - self.min_delta
-            self.last_scores = self.last_scores[1:]
-            self.already_stopped = should_stop
-            return should_stop
+        return self.current_epoch - self.best_epoch > self.patience
 
 def gray_2_colormap_np(img, max_disp=None):
     img = img.cpu().detach().numpy().squeeze()
@@ -305,7 +300,7 @@ def main(cfg):
                                      'val/d1_5px': 100 * d1_5px}, epoch)
                 accelerator.wait_for_everyone()
 
-                if d1_early_stopper(d1_3px) and epe_early_stopper(epe):
+                if d1_early_stopper(d1_3px, epoch) and epe_early_stopper(epe, epoch):
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
                     break
