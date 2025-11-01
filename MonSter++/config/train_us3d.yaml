@@ -5,9 +5,9 @@ project_dir: ./logs/us3d/
 encoder: 'vitl'
 batch_size: 16
 train_datasets: ['us3d']
-d1_patience: 4
+d1_patience: 5
 d1_min_delta: 0.0003
-epe_patience: 4
+epe_patience: 5
 epe_min_delta: 0.002
 lr: 1e-4
 wdecay: 1e-5
