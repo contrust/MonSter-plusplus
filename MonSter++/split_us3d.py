@@ -1,6 +1,7 @@
 import glob
 import os
 import shutil
+import torch
 from torch.utils.data import random_split
 import numpy as np
 from typing import Tuple, Optional, List
@@ -15,12 +16,12 @@ DEST_TRAIN_DIR = os.path.join(DEST_ROOT, "train")
 DEST_VAL_DIR = os.path.join(DEST_ROOT, "val")
 DEST_TEST_DIR = os.path.join(DEST_ROOT, "test")
 SEED = 666
-JAX_TRAIN_RATIO = 0.7
-JAX_VAL_RATIO = 0.1
-JAX_TEST_RATIO = 0.2
-OMA_TRAIN_RATIO = 0.0
-OMA_VAL_RATIO = 0.0
-OMA_TEST_RATIO = 1.0
+JAX_TILE_TRAIN_RATIO = 0.7
+JAX_TILE_VAL_RATIO = 0.1
+JAX_TILE_TEST_RATIO = 0.2
+OMA_TILE_TRAIN_RATIO = 0.00
+OMA_TILE_VAL_RATIO = 0.00
+OMA_TILE_TEST_RATIO = 1.00
 TRAIN_CROP_SIZE = (256, 1024)
 SPLIT_INFO_BASENAME = "split_info.txt"
 
@@ -39,6 +40,41 @@ def add_suffix_before_extension(file_path: str, suffix: str) -> str:
     before_extension, extension = file_path.rsplit('.', 1)
     return f"{before_extension}{suffix}.{extension}"
 
+def get_tile_number_from_file_path(file_path: str) -> str:
+    basename = os.path.basename(file_path)
+    return basename.split("_")[1]
+
+def get_unique_tile_numbers_from_file_paths(file_paths: List[str]) -> List[str]:
+    tile_numbers_set = set()
+    for file_path in file_paths:
+        tile_number = get_tile_number_from_file_path(file_path)
+        tile_numbers_set.add(tile_number)
+    tile_numbers = list(tile_numbers_set)
+    tile_numbers.sort()
+    return tile_numbers
+
+def get_data_split_by_tile_numbers(data_list: List[Tuple[str, str, str]],
+                                   train_tile_numbers: List[str],
+                                   val_tile_numbers: List[str],
+                                   test_tile_numbers: List[str]) -> List[Tuple[str, str, str]]:
+    train_data_list = []
+    val_data_list = []
+    test_data_list = []
+    train_tile_numbers_set = set(train_tile_numbers)
+    val_tile_numbers_set = set(val_tile_numbers)
+    test_tile_numbers_set = set(test_tile_numbers)
+    for data in data_list:
+        tile_number = get_tile_number_from_file_path(data[0])
+        if tile_number in train_tile_numbers_set:
+            train_data_list.append(data)
+        elif tile_number in val_tile_numbers_set:
+            val_data_list.append(data)
+        elif tile_number in test_tile_numbers_set:
+            test_data_list.append(data)
+        else:
+            print(f"Tile number {tile_number} not found in train, val, or test sets")
+    return train_data_list, val_data_list, test_data_list
+
 def main():
     print("--------------------------------")
     print(f"Source images root: {SOURCE_IMAGES_ROOT}")
@@ -47,48 +83,87 @@ def main():
     print(f"Dest val dir: {DEST_VAL_DIR}")
     print(f"Dest test dir: {DEST_TEST_DIR}")
     print(f"Seed: {SEED}")
-    print(f"JAX train ratio: {JAX_TRAIN_RATIO}")
-    print(f"JAX val ratio: {JAX_VAL_RATIO}")
-    print(f"JAX test ratio: {JAX_TEST_RATIO}")
-    print(f"OMA train ratio: {OMA_TRAIN_RATIO}")
-    print(f"OMA val ratio: {OMA_VAL_RATIO}")
-    print(f"OMA test ratio: {OMA_TEST_RATIO}")
+    print(f"JAX tile train ratio: {JAX_TILE_TRAIN_RATIO}")
+    print(f"JAX tile val ratio: {JAX_TILE_VAL_RATIO}")
+    print(f"JAX tile test ratio: {JAX_TILE_TEST_RATIO}")
+    print(f"OMA tile train ratio: {OMA_TILE_TRAIN_RATIO}")
+    print(f"OMA tile val ratio: {OMA_TILE_VAL_RATIO}")
+    print(f"OMA tile test ratio: {OMA_TILE_TEST_RATIO}")
     print(f"Train crop size: {TRAIN_CROP_SIZE}")
     print("--------------------------------")
     print("Checking if source directories exist...")
     assert os.path.exists(SOURCE_IMAGES_ROOT)
     assert os.path.exists(SOURCE_DISP_ROOT)
     print("Done")
+    print("Setting seed...")
+    np.random.seed(SEED)
+    random.seed(SEED)
+    torch.manual_seed(SEED)
+    print("Done")
+    print("Checking if source directories exist...")
+    assert os.path.exists(SOURCE_IMAGES_ROOT)
+    assert os.path.exists(SOURCE_DISP_ROOT)
+    print("Done")
     print("Checking if destination directories exist...")
+    if os.path.exists(DEST_TRAIN_DIR):
+        answer = input("Dest train dir already exists, do you want to continue? (y/n) ")
+        if str.lower(answer) != "y":
+            print("Exiting...")
+            exit(0)
+        shutil.rmtree(DEST_TRAIN_DIR)
+    if os.path.exists(DEST_VAL_DIR):
+        answer = input("Dest val dir already exists, do you want to continue? (y/n) ")
+        if str.lower(answer) != "y":
+            print("Exiting...")
+            exit(0)
+        shutil.rmtree(DEST_VAL_DIR)
+    if os.path.exists(DEST_TEST_DIR):
+        answer = input("Dest test dir already exists, do you want to continue? (y/n) ")
+        if str.lower(answer) != "y":
+            print("Exiting...")
+            exit(0)
+        shutil.rmtree(DEST_TEST_DIR)
     print("Creating destination directories...")
     os.makedirs(DEST_TRAIN_DIR, exist_ok=True)
     os.makedirs(DEST_VAL_DIR, exist_ok=True)
     os.makedirs(DEST_TEST_DIR, exist_ok=True)
     print("Done")
     print("Reading image and disp lists...")
-    image_left_list = sorted(glob.glob(os.path.join(SOURCE_IMAGES_ROOT, '*LEFT*.tif')))
-    image_right_list = sorted(glob.glob(os.path.join(SOURCE_IMAGES_ROOT, '*RIGHT*.tif')))
-    disp_list = sorted(glob.glob(os.path.join(SOURCE_DISP_ROOT, '*DSP*.tif')))
-    assert len(image_left_list) == len(image_right_list) == len(disp_list)
-    print(f"Found {len(image_left_list)} images")
+    jax_image_left_list = sorted(glob.glob(os.path.join(SOURCE_IMAGES_ROOT, 'JAX*LEFT*.tif')))
+    jax_image_right_list = sorted(glob.glob(os.path.join(SOURCE_IMAGES_ROOT, 'JAX*RIGHT*.tif')))
+    jax_disp_list = sorted(glob.glob(os.path.join(SOURCE_DISP_ROOT, 'JAX*DSP*.tif')))
+    oma_image_left_list = sorted(glob.glob(os.path.join(SOURCE_IMAGES_ROOT, 'OMA*LEFT*.tif')))
+    oma_image_right_list = sorted(glob.glob(os.path.join(SOURCE_IMAGES_ROOT, 'OMA*RIGHT*.tif')))
+    oma_disp_list = sorted(glob.glob(os.path.join(SOURCE_DISP_ROOT, 'OMA*DSP*.tif')))
+    assert len(jax_image_left_list) == len(jax_image_right_list) == len(jax_disp_list)
+    assert len(oma_image_left_list) == len(oma_image_right_list) == len(oma_disp_list)
+    print(f"Found {len(jax_image_left_list)} JAX images")
+    print(f"Found {len(oma_image_left_list)} OMA images")
+    jax_data_list = list(zip(jax_image_left_list, jax_image_right_list, jax_disp_list))
+    oma_data_list = list(zip(oma_image_left_list, oma_image_right_list, oma_disp_list))
+    jax_tile_numbers = get_unique_tile_numbers_from_file_paths(jax_image_left_list)
+    oma_tile_numbers = get_unique_tile_numbers_from_file_paths(oma_image_left_list)
+    print(f"Found {len(jax_tile_numbers)} JAX tile numbers")
+    print(f"Found {len(oma_tile_numbers)} OMA tile numbers")
     print("Splitting data into train, val, and test sets...")
-    data_list = list(zip(image_left_list, image_right_list, disp_list))
-    jax_train_list, jax_val_list, jax_test_list = random_split(data_list, [JAX_TRAIN_RATIO, JAX_VAL_RATIO, JAX_TEST_RATIO])
-    oma_train_list, oma_val_list, oma_test_list = random_split(data_list, [OMA_TRAIN_RATIO, OMA_VAL_RATIO, OMA_TEST_RATIO])
-    train_list = jax_train_list + oma_train_list
-    val_list = jax_val_list + oma_val_list
-    test_list = jax_test_list + oma_test_list
+    jax_train_tile_numbers, jax_val_tile_numbers, jax_test_tile_numbers = random_split(jax_tile_numbers, [JAX_TILE_TRAIN_RATIO, JAX_TILE_VAL_RATIO, JAX_TILE_TEST_RATIO])
+    oma_train_tile_numbers, oma_val_tile_numbers, oma_test_tile_numbers = random_split(oma_tile_numbers, [OMA_TILE_TRAIN_RATIO, OMA_TILE_VAL_RATIO, OMA_TILE_TEST_RATIO])
+    jax_train_data_list, jax_val_data_list, jax_test_data_list = get_data_split_by_tile_numbers(jax_data_list, jax_train_tile_numbers, jax_val_tile_numbers, jax_test_tile_numbers)
+    oma_train_data_list, oma_val_data_list, oma_test_data_list = get_data_split_by_tile_numbers(oma_data_list, oma_train_tile_numbers, oma_val_tile_numbers, oma_test_tile_numbers)
+    train_data_list = jax_train_data_list + oma_train_data_list
+    val_data_list = jax_val_data_list + oma_val_data_list
+    test_data_list = jax_test_data_list + oma_test_data_list
     print("Done")
     print("--------------------------------")
-    print(f"JAX train split: {JAX_TRAIN_RATIO}, {len(jax_train_list)} JAX train images")
-    print(f"JAX val split: {JAX_VAL_RATIO}, {len(jax_val_list)} JAX val images")
-    print(f"JAX test split: {JAX_TEST_RATIO}, {len(jax_test_list)} JAX test images")
-    print(f"OMA train split: {OMA_TRAIN_RATIO}, {len(oma_train_list)} OMA train images")
-    print(f"OMA val split: {OMA_VAL_RATIO}, {len(oma_val_list)} OMA val images")
-    print(f"OMA test split: {OMA_TEST_RATIO}, {len(oma_test_list)} OMA test images")
+    print(f"JAX tile train split: {JAX_TILE_TRAIN_RATIO}, {len(jax_train_data_list)} images")
+    print(f"JAX tile val split: {JAX_TILE_VAL_RATIO}, {len(jax_val_data_list)} images")
+    print(f"JAX tile test split: {JAX_TILE_TEST_RATIO}, {len(jax_test_data_list)} images")
+    print(f"OMA tile train split: {OMA_TILE_TRAIN_RATIO}, {len(oma_train_data_list)} images")
+    print(f"OMA tile val split: {OMA_TILE_VAL_RATIO}, {len(oma_val_data_list)} images")
+    print(f"OMA tile test split: {OMA_TILE_TEST_RATIO}, {len(oma_test_data_list)} images")
     print("--------------------------------")
     print("Cropping the train images and saving to the train directory...")
-    for (image_left_path, image_right_path, disp_path) in tqdm(train_list, desc="train", unit="image"):
+    for (image_left_path, image_right_path, disp_path) in tqdm(train_data_list, desc="train", unit="image"):
         image_left = Image.open(image_left_path)
         image_right = Image.open(image_right_path)
         disp = Image.open(disp_path)
@@ -105,28 +180,34 @@ def main():
                 Image.fromarray(cropped_disp_image).convert("F").save(disp_image_path)
     print("Done")
     print("Saving the val images to the val directory...")
-    for (image_left_path, image_right_path, disp_path) in tqdm(val_list, desc="val", unit="image"):
+    for (image_left_path, image_right_path, disp_path) in tqdm(val_data_list, desc="val", unit="image"):
         shutil.copy(image_left_path, os.path.join(DEST_VAL_DIR, os.path.basename(image_left_path)))
         shutil.copy(image_right_path, os.path.join(DEST_VAL_DIR, os.path.basename(image_right_path)))
         shutil.copy(disp_path, os.path.join(DEST_VAL_DIR, os.path.basename(disp_path)))
     print("Done")
     print("Saving the test images to the test directory...")
-    for (image_left_path, image_right_path, disp_path) in tqdm(test_list, desc="test", unit="image"):
+    for (image_left_path, image_right_path, disp_path) in tqdm(test_data_list, desc="test", unit="image"):
         shutil.copy(image_left_path, os.path.join(DEST_TEST_DIR, os.path.basename(image_left_path)))
         shutil.copy(image_right_path, os.path.join(DEST_TEST_DIR, os.path.basename(image_right_path)))
         shutil.copy(disp_path, os.path.join(DEST_TEST_DIR, os.path.basename(disp_path)))
     print("Done")
     print("Saving the split information to the split info file...")
     with open(os.path.join(DEST_ROOT, SPLIT_INFO_BASENAME), "w") as f:
-        f.write(f"JAX train ratio: {JAX_TRAIN_RATIO}\n")
-        f.write(f"JAX val ratio: {JAX_VAL_RATIO}\n")
-        f.write(f"JAX test ratio: {JAX_TEST_RATIO}\n")
-        f.write(f"OMA train ratio: {OMA_TRAIN_RATIO}\n")
-        f.write(f"OMA val ratio: {OMA_VAL_RATIO}\n")
-        f.write(f"OMA test ratio: {OMA_TEST_RATIO}\n")
-        f.write(f"Train list length: {len(train_list)}\n")
-        f.write(f"Val list length: {len(val_list)}\n")
-        f.write(f"Test list length: {len(test_list)}\n")
+        f.write(f"JAX tile train ratio: {JAX_TILE_TRAIN_RATIO}\n")
+        f.write(f"JAX tile val ratio: {JAX_TILE_VAL_RATIO}\n")
+        f.write(f"JAX tile test ratio: {JAX_TILE_TEST_RATIO}\n")
+        f.write(f"OMA tile train ratio: {OMA_TILE_TRAIN_RATIO}\n")
+        f.write(f"OMA tile val ratio: {OMA_TILE_VAL_RATIO}\n")
+        f.write(f"OMA tile test ratio: {OMA_TILE_TEST_RATIO}\n")
+        f.write(f"Train list length: {len(train_data_list)}\n")
+        f.write(f"JAX train list length: {len(jax_train_data_list)}\n")
+        f.write(f"OMA train list length: {len(oma_train_data_list)}\n")
+        f.write(f"Val list length: {len(val_data_list)}\n")
+        f.write(f"JAX val list length: {len(jax_val_data_list)}\n")
+        f.write(f"OMA val list length: {len(oma_val_data_list)}\n")
+        f.write(f"Test list length: {len(test_data_list)}\n")
+        f.write(f"JAX test list length: {len(jax_test_data_list)}\n")
+        f.write(f"OMA test list length: {len(oma_test_data_list)}\n")
         f.write(f"Seed: {SEED}\n")
         f.write(f"Train crop size: {TRAIN_CROP_SIZE}\n")
     print("Done")
