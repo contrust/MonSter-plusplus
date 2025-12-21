@@ -595,7 +595,7 @@ def main(cfg):
                     shutil.rmtree(temp_dir)
                 accelerator.wait_for_everyone()
                 print(f"Done waiting for everyone_{accelerator.process_index}")
-                if d1_early_stoppers[accelerator.process_index](d1_mean, epoch) and epe_early_stoppers[accelerator.process_index](epe_mean, epoch):
+                if d1_early_stoppers[accelerator.process_index](aggregated_d1_mean, epoch) and epe_early_stoppers[accelerator.process_index](aggregated_epe_mean, epoch):
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
                     break
