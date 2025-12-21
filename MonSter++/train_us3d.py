@@ -40,15 +40,17 @@ class EarlyStopper:
         self.current_epoch = 0
         self.best_score = float('inf') if min_mode else float('-inf')
         self.best_epoch = 0
+        print(f"EarlyStopper: patience: {self.patience}, min_delta: {self.min_delta}, min_mode: {self.min_mode}")
 
     def __call__(self, score: float, epoch: int) -> bool:
+        print(f"EarlyStopper: score: {score}, epoch: {epoch}, best_score: {self.best_score}, best_epoch: {self.best_epoch}, min_delta: {self.min_delta}, min_mode: {self.min_mode}, current_epoch: {self.current_epoch}")
         self.current_epoch = epoch
         is_current_best = score < self.best_score - self.min_delta if self.min_mode else score > self.best_score + self.min_delta
         if is_current_best:
             self.best_score = score
             self.best_epoch = epoch
             return False
-        return self.current_epoch - self.best_epoch > self.patience
+        return self.current_epoch - self.best_epoch >= self.patience
 
 def gray_2_colormap_np(img, max_disp=None):
     img = img.cpu().detach().numpy().squeeze()
@@ -227,8 +229,8 @@ def main(cfg):
     train_loader, val_loader, model, optimizer, lr_scheduler = accelerator.prepare(train_loader, val_loader, model, optimizer, lr_scheduler)
     should_keep_training = True
     epoch = 0
-    d1_early_stoppers = [EarlyStopper(patience=cfg.d1_patience, min_delta=cfg.d1_min_delta, min_mode=True) for _ in range(accelerator.num_processes)]
-    epe_early_stoppers = [EarlyStopper(patience=cfg.epe_patience, min_delta=cfg.epe_min_delta, min_mode=True) for _ in range(accelerator.num_processes)]
+    d1_early_stopper = EarlyStopper(patience=cfg.d1_patience, min_delta=cfg.d1_min_delta, min_mode=True)
+    epe_early_stopper = EarlyStopper(patience=cfg.epe_patience, min_delta=cfg.epe_min_delta, min_mode=True)
 
     # Initialize tracking for worst/best images (now using file paths)
     historical_file_paths_epe_worst = []
@@ -595,7 +597,7 @@ def main(cfg):
                     shutil.rmtree(temp_dir)
                 accelerator.wait_for_everyone()
                 print(f"Done waiting for everyone_{accelerator.process_index}")
-                if d1_early_stoppers[accelerator.process_index](aggregated_d1_mean, epoch) and epe_early_stoppers[accelerator.process_index](aggregated_epe_mean, epoch):
+                if d1_early_stopper(aggregated_d1_mean, epoch) and epe_early_stopper(aggregated_epe_mean, epoch):
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
                     break
