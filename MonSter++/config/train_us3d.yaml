@@ -36,19 +36,19 @@ min_scale: -0.2
 max_scale: 0.0
 do_flip: ''
 yjitter: False
-brightness_range: 0.2
-contrast_range: 0.2
-saturation_range: 0.2
-hue_range: 0.05
-gamma: [0.9, 1.1]
+brightness_range: 0.0
+contrast_range: 0.0
+saturation_range: 0.0
+hue_range: 0.00
+gamma: [1.0, 1.0]
 spatial_aug_prob: 0.0
 stretch_prob: 0.0
 max_stretch: 0.0
 h_flip_prob: 0.0
 v_flip_prob: 0.0
 asymmetric_color_aug_prob: 0.0
-noise_aug_prob: 0.0
-noise_sigma_range: [0.0, 0.0]
+noise_aug_prob: 1.0
+noise_sigma_range: [0.0, 0.1]
 eraser_aug_prob: 0.0
 num_gpu: 8
 seed: 666
