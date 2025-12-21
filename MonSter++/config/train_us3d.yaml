@@ -1,9 +1,12 @@
 tensorboard: {}
-project_name: monster-us3d-baseline-max-disp-96
+project_name: monster-us3d-baseline-noise-aug-medium
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
+metrics_base_path: ./metrics/us3d/
+temp_dir: ./temp/us3d/
 encoder: 'vitl'
 batch_size: 16
+val_batch_size: 16
 train_datasets: ['us3d']
 d1_patience: 5
 d1_min_delta: 0.0003
@@ -16,9 +19,9 @@ current_val_step: 0
 total_step: 30000
 save_frequency: 30001
 save_path: ./checkpoints/us3d/
-train_image_frequency: 500
-val_image_frequency: 5
 val_frequency: 1
+num_worst_images: 4
+num_best_images: 2
 image_size: [256, 1024]
 train_iters: 22
 valid_iters: 32
@@ -28,10 +31,24 @@ corr_radius: 4
 n_downsample: 2
 n_gru_layers: 3
 hidden_dims: [128, 128, 128]
-max_disp: 96
-saturation_range: [1.0, 1.0]
+max_disp: 128
+min_scale: -0.2
+max_scale: 0.0
 do_flip: ''
-spatial_scale: [-0.2, 0.0]
-noyjitter: True
+yjitter: False
+brightness_range: 0.0
+contrast_range: 0.0
+saturation_range: 0.0
+hue_range: 0.00
+gamma: [1.0, 1.0]
+spatial_aug_prob: 0.0
+stretch_prob: 0.0
+max_stretch: 0.0
+h_flip_prob: 0.0
+v_flip_prob: 0.0
+asymmetric_color_aug_prob: 0.0
+noise_aug_prob: 1.0
+noise_sigma_range: [0.0, 0.1]
+eraser_aug_prob: 0.0
 num_gpu: 8
 seed: 666

@@ -389,12 +389,67 @@ def validate_middlebury(model, iters=32, resolution='F', split='MiddEval3', mixe
     print(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}")
     return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
 
+def validate_us3d(model, iters=32, split='val', num_best_images=5, num_worst_images=5, evaluation_save_path='./output/us3d/'):
+    """ Peform validation using the US3D dataset """
+    logging.info("Starting US3D evaluation...")
+    logging.info(f"US3D valid iters: {iters}")
+    logging.info(f"US3D split: {split}")
+    logging.info(f"US3D num best images: {num_best_images}")
+    logging.info(f"US3D num worst images: {num_worst_images}")
+    logging.info(f"US3D evaluation save path: {evaluation_save_path}")
+
+    if not os.path.exists(evaluation_save_path):
+        os.makedirs(evaluation_save_path, exist_ok=True)
+
+    model.eval()
+    val_dataset = datasets.US3D(aug_params=None, split=split)
+    out_list, epe_list = [], []
+    for val_id in range(len(val_dataset)):
+        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        image1 = image1[None].cuda()
+        image2 = image2[None].cuda()
+
+        padder = InputPadder(image1.shape, divis_by=32)
+        image1, image2 = padder.pad(image1, image2)
+    
+        with autocast(enabled=mixed_prec):
+            flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+
+        assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
+        epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+
+        epe_flattened = epe.flatten()
+    
+        out = (epe_flattened > 3.0)
+        image_out = out[val].float().mean().item()
+        image_epe = epe_flattened[val].mean().item()
+        logging.info(f"US3D Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+        epe_list.append(image_epe)
+        out_list.append(image_out)
+
+    epe_list = np.array(epe_list)
+    out_list = np.array(out_list)
+
+    epe = np.mean(epe_list)
+    d1 = 100 * np.mean(out_list)
+
+    print(f"Validation US3D: EPE {epe}, D1 {d1}")
+    return {'us3d-epe': epe, 'us3d-d1': d1}
+
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
+    logging.info("Starting US3D evaluation...")
     parser = argparse.ArgumentParser()
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default="./checkpoints/sceneflow.pth")
 
     parser.add_argument('--dataset', help="dataset for evaluation", default='sceneflow', choices=["eth3d", "kitti", "sceneflow", "vkitti", "driving"] + [f"middlebury_{s}" for s in 'FHQ'])
+    parser.add_argument('--us3d_split', help="split for us3d evaluation", default='val', choices=['train', 'val', 'test'])
+    parser.add_argument('--us3d_num_best_images', help="number of best images to evaluate", default=5)
+    parser.add_argument('--us3d_num_worst_images', help="number of worst images to evaluate", default=5)
+    parser.add_argument('--us3d_evaluation_save_path', help="path to save us3d evaluation results", default='./output/us3d/')
     parser.add_argument('--mixed_precision', default=False, action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
 
@@ -408,7 +463,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_downsample', type=int, default=2, help="resolution of the disparity field (1/2^K)")
     parser.add_argument('--slow_fast_gru', action='store_true', help="iterate the low-res GRUs more frequently")
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
-    parser.add_argument('--max_disp', type=int, default=416, help="max disp of geometry encoding volume")
+    parser.add_argument('--max_disp', type=int, default=128, help="max disp of geometry encoding volume")
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(Monster(args), device_ids=[0])
@@ -466,3 +521,10 @@ if __name__ == '__main__':
 
     elif args.dataset == 'driving':
         validate_driving(model, iters=args.valid_iters, mixed_prec=use_mixed_precision)
+
+    elif args.dataset == 'us3d':
+        validate_us3d(model, iters=args.valid_iters,
+                             split=args.us3d_split,
+                             num_best_images=args.us3d_num_best_images,
+                             num_worst_images=args.us3d_num_worst_images,
+                             evaluation_save_path=args.us3d_evaluation_save_path)

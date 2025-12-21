@@ -1,4 +1,5 @@
 import os
+import shutil
 import hydra
 import torch
 from tqdm import tqdm
@@ -9,7 +10,7 @@ from omegaconf import OmegaConf
 import torch.nn.functional as F
 from accelerate import Accelerator
 import core.stereo_datasets as datasets
-from accelerate.utils import set_seed
+from accelerate.utils import broadcast_object_list, set_seed
 from accelerate import DataLoaderConfiguration
 from accelerate.utils import DistributedDataParallelKwargs
 from core.warp import disp_warp
@@ -22,6 +23,10 @@ from pathlib import Path
 import torch.distributed as dist
 from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
+from collections import defaultdict
+import heapq
+from accelerate.utils import gather_object
+import pickle
 
 class EarlyStopper:
     def __init__(self, patience: int, min_delta: float, min_mode: bool) -> None:
@@ -175,9 +180,8 @@ def main(cfg):
     val_dataset = datasets.US3D(aug_params=None, split='val')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=cfg.batch_size,
         pin_memory=True, shuffle=True, num_workers=int(1), drop_last=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.val_batch_size,
         pin_memory=True, shuffle=False, num_workers=int(1), drop_last=False)
-
     model = Monster(cfg)
     optimizer, lr_scheduler = fetch_optimizer(cfg, model)
 
@@ -220,20 +224,57 @@ def main(cfg):
         total_step = 0
 
     total_step = cfg.current_total_step
-    val_step = cfg.current_val_step
     train_loader, val_loader, model, optimizer, lr_scheduler = accelerator.prepare(train_loader, val_loader, model, optimizer, lr_scheduler)
     should_keep_training = True
     epoch = 0
-    d1_early_stopper = EarlyStopper(patience=cfg.d1_patience, min_delta=cfg.d1_min_delta, min_mode=True)
-    epe_early_stopper = EarlyStopper(patience=cfg.epe_patience, min_delta=cfg.epe_min_delta, min_mode=True)
+    d1_early_stoppers = [EarlyStopper(patience=cfg.d1_patience, min_delta=cfg.d1_min_delta, min_mode=True) for _ in range(accelerator.num_processes)]
+    epe_early_stoppers = [EarlyStopper(patience=cfg.epe_patience, min_delta=cfg.epe_min_delta, min_mode=True) for _ in range(accelerator.num_processes)]
+
+    # Initialize tracking for worst/best images (now using file paths)
+    historical_file_paths_epe_worst = []
+    historical_file_paths_epe_best = []
+    historical_file_paths_d1_worst = []
+    historical_file_paths_d1_best = []
+    current_file_paths_epe_worst = []
+    current_file_paths_epe_best = []
+    current_file_paths_d1_worst = []
+    current_file_paths_d1_best = []
+    if not cfg.restore_ckpt.endswith("None"):
+        # Load historical file paths from checkpoint if available
+        checkpoint = torch.load(cfg.restore_ckpt, map_location='cpu')
+        if 'historical_file_paths_epe_worst' in checkpoint:
+            historical_file_paths_epe_worst = checkpoint['historical_file_paths_epe_worst']
+            historical_file_paths_epe_best = checkpoint['historical_file_paths_epe_best']
+            historical_file_paths_d1_worst = checkpoint['historical_file_paths_d1_worst']
+            historical_file_paths_d1_best = checkpoint['historical_file_paths_d1_best']
+            print("Loaded historical file paths from checkpoint")
+    else:
+        print("No historical file paths loaded; will compute on first epoch")   
+
+
+    # For current epoch tracking (using heaps for efficiency)
+    num_worst_images = cfg.num_worst_images
+    num_best_images = cfg.num_best_images
+
+    project_metrics_path = os.path.join(cfg.metrics_base_path, cfg.project_name)
+    epe_metrics_path = os.path.join(project_metrics_path, 'epe')
+    d1_metrics_path = os.path.join(project_metrics_path, 'd1')
+    temp_dir = os.path.join(cfg.temp_dir, cfg.project_name)
+    os.makedirs(project_metrics_path, exist_ok=True)
+    os.makedirs(epe_metrics_path, exist_ok=True)
+    os.makedirs(d1_metrics_path, exist_ok=True)
     try:
         while should_keep_training:
+            
             if epoch % cfg.val_frequency == 0:
+                if accelerator.is_main_process:
+                    os.makedirs(temp_dir, exist_ok=True)
+                accelerator.wait_for_everyone()
                 torch.cuda.empty_cache()
                 model.eval()
-                elem_num, total_epe, total_out1, total_out2, total_out3, total_out4, total_out5 = 0, 0, 0, 0, 0, 0, 0
-                for data in tqdm(val_loader, dynamic_ncols=True, disable=not accelerator.is_main_process):
-                    val_step += 1
+                elem_num, total_epe, total_out = 0, 0, 0
+                epe_list, d1_list = [], []
+                for data in tqdm(val_loader, dynamic_ncols=True, disable=not accelerator.is_main_process, desc="Validating"):
                     (imageL_file, imageR_file, GT_file), left, right, disp_gt, valid = [x for x in data]
                     padder = InputPadder(left.shape, divis_by=32)
                     left, right = padder.pad(left, right)
@@ -241,84 +282,337 @@ def main(cfg):
                         disp_pred = model(left, right, iters=cfg.valid_iters, test_mode=True)
                     disp_pred = padder.unpad(disp_pred)
                     assert disp_pred.shape == disp_gt.shape, (disp_pred.shape, disp_gt.shape)
-                    epe = torch.abs(disp_pred - disp_gt)
-                    out1 = (epe > 1.0).float()
-                    out2 = (epe > 2.0).float()
-                    out3 = (epe > 3.0).float()
-                    out4 = (epe > 4.0).float()
-                    out5 = (epe > 5.0).float()
-                    epe = torch.squeeze(epe, dim=1)
-                    out1 = torch.squeeze(out1, dim=1)
-                    out2 = torch.squeeze(out2, dim=1)
-                    out3 = torch.squeeze(out3, dim=1)
-                    out4 = torch.squeeze(out4, dim=1)
-                    out5 = torch.squeeze(out5, dim=1)
-                    epe, out1, out2, out3, out4, out5 = accelerator.gather_for_metrics((epe[valid >= 0.5].mean(),
-                        out1[valid >= 0.5].mean(),
-                        out2[valid >= 0.5].mean(),
-                        out3[valid >= 0.5].mean(),
-                        out4[valid >= 0.5].mean(),
-                        out5[valid >= 0.5].mean()))
-                    elem_num += epe.shape[0]
-                    for i in range(epe.shape[0]):
-                        total_epe += epe[i]
-                        total_out1 += out1[i]
-                        total_out2 += out2[i]
-                        total_out3 += out3[i]
-                        total_out4 += out4[i]
-                        total_out5 += out5[i]
-                    if val_step % cfg.val_image_frequency == 0:
-                        if accelerator.is_main_process:
-                            image1_np = left[0].squeeze().cpu().numpy()
-                            image1_np = (image1_np - image1_np.min()) / (image1_np.max() - image1_np.min()) * 255.0
-                            image1_np = image1_np.astype(np.uint8)
-
-                            disp_pred_np = gray_2_colormap_np(disp_pred[0].squeeze())
-                            disp_gt_np = gray_2_colormap_np(disp_gt[0].squeeze())
-
-                            tracker = accelerator.get_tracker('tensorboard')
-                            writer = tracker.writer
-
-                            writer.add_image("val/left", image1_np, val_step, dataformats='CHW')
-                            writer.add_image("val/disp_pred", disp_pred_np, val_step, dataformats='HWC')
-                            writer.add_image("val/disp_gt", disp_gt_np, val_step, dataformats='HWC')
-                        accelerator.wait_for_everyone()
                     
-                epe = total_epe / elem_num
-                d1_1px = total_out1 / elem_num
-                d1_2px = total_out2 / elem_num
-                d1_3px = total_out3 / elem_num
-                d1_4px = total_out4 / elem_num
-                d1_5px = total_out5 / elem_num
+                    for b in range(left.shape[0]):
+                        # Compute metrics exactly as in sequence_loss and logging
+                        valid_mask = valid[b] >= 0.5
+                        if valid_mask.sum() == 0:
+                            continue
+                        
+                        disp_pred_b = disp_pred[b].squeeze(0)  # [H, W]
+                        disp_gt_b = disp_gt[b].squeeze(0)      # [H, W]
+                        epe_per_pixel = torch.abs(disp_pred_b - disp_gt_b)  # [H, W]
+                        
+                        # EPE: Mean of per-pixel absolute errors (matching sequence_loss)
+                        epe_mean = epe_per_pixel[valid_mask].mean().item()
+                        
+                        # D1: Percentage of valid pixels with error > 3px (matching logged d1_3px)
+                        d1_mean = (epe_per_pixel > 3.0).float()[valid_mask].mean().item()  # Percentage
+                        
+                        sample_file_path = imageL_file[b]  # Use left image file path as identifier
 
+                        # Prepare tracking tuples
+                        epe_tuple = (epe_mean, sample_file_path)
+                        d1_tuple = (d1_mean * 100, sample_file_path)
+
+                        # Update current epoch tracking (always, for all epochs to handle first epoch)
+                        d1_list.append(d1_tuple)
+                        epe_list.append(epe_tuple)
+                    
+                # Each process saves its tracking data to unique files
+                with open(os.path.join(temp_dir, f'epe_list_{accelerator.process_index}.pkl'), 'wb') as f:
+                    print(f"Saving epe list of length {len(epe_list)} to epe_list_{accelerator.process_index}.pkl")
+                    pickle.dump(epe_list, f)
+                with open(os.path.join(temp_dir, f'd1_list_{accelerator.process_index}.pkl'), 'wb') as f:
+                    print(f"Saving d1 list of length {len(d1_list)} to d1_list_{accelerator.process_index}.pkl")
+                    pickle.dump(d1_list, f)
+
+                accelerator.wait_for_everyone()  # Ensure all files are written
+
+                # On main process, load and aggregate from files
+                # Reset the lists
+                aggregated_epe_list = []
+                aggregated_d1_list = []
+                
+                # Load and aggregate for each type
+                print(f"Aggregating epe and d1 lists from {accelerator.process_index} process")
+                for i in range(accelerator.num_processes):
+                    with open(os.path.join(temp_dir, f'epe_list_{i}.pkl'), 'rb') as f:
+                        data = pickle.load(f)
+                        print(f"Loaded epe list of length {len(data)} from epe_list_{i}.pkl")
+                        aggregated_epe_list.extend(data)
+                    with open(os.path.join(temp_dir, f'd1_list_{i}.pkl'), 'rb') as f:
+                        data = pickle.load(f)
+                        print(f"Loaded d1 list of length {len(data)} from d1_list_{i}.pkl")
+                        aggregated_d1_list.extend(data)
+                
+                aggregated_epe_list.sort()
+                aggregated_d1_list.sort()
+
+                aggregated_epe_mean = sum([epe for epe, _ in aggregated_epe_list]) / len(aggregated_epe_list)
+                aggregated_d1_mean = sum([d1 for d1, _ in aggregated_d1_list]) / len(aggregated_d1_list)
                 if accelerator.is_main_process:
-                    accelerator.log({'val/epe': epe,
-                                     'val/d1_1px': 100 * d1_1px,
-                                     'val/d1_2px': 100 * d1_2px,
-                                     'val/d1_3px': 100 * d1_3px,
-                                     'val/d1_4px': 100 * d1_4px,
-                                     'val/d1_5px': 100 * d1_5px}, epoch)
+                    print(f"Aggregated epe_list length: {len(aggregated_epe_list)}")
+                    print(f"Aggregated d1_list length: {len(aggregated_d1_list)}")
+                    print(f"Logging epe_mean: {aggregated_epe_mean}, d1_mean: {aggregated_d1_mean}")
+                    with open(os.path.join(epe_metrics_path, f'{epoch}.txt'), 'w') as f:
+                        for epe, fp in aggregated_epe_list:
+                            f.write(f"{fp} {epe}\n")
+                    with open(os.path.join(d1_metrics_path, f'{epoch}.txt'), 'w') as f:
+                        for d1, fp in aggregated_d1_list:
+                            f.write(f"{fp} {d1}\n")
+                    accelerator.log({'val/epe_mean': aggregated_epe_mean,
+                                     'val/d1_mean': aggregated_d1_mean}, epoch)
                 accelerator.wait_for_everyone()
 
-                if d1_early_stopper(d1_3px, epoch) and epe_early_stopper(epe, epoch):
+                best_epe_list = aggregated_epe_list[:num_best_images]
+                worst_epe_list = list(reversed(aggregated_epe_list[-num_worst_images:]))
+                best_d1_list = aggregated_d1_list[:num_best_images]
+                worst_d1_list = list(reversed(aggregated_d1_list[-num_worst_images:]))
+
+                current_file_paths_epe_best = [fp for _, fp in best_epe_list]
+                current_file_paths_epe_worst = [fp for _, fp in worst_epe_list]
+                current_file_paths_d1_best = [fp for _, fp in best_d1_list]
+                current_file_paths_d1_worst = [fp for _, fp in worst_d1_list]
+
+                if epoch == 0:
+                    historical_file_paths_epe_best = [fp for _, fp in best_epe_list]
+                    historical_file_paths_epe_worst = [fp for _, fp in worst_epe_list]
+                    historical_file_paths_d1_best = [fp for _, fp in best_d1_list]
+                    historical_file_paths_d1_worst = [fp for _, fp in worst_d1_list]
+
+                paths_to_save = set(current_file_paths_epe_best +
+                                        current_file_paths_epe_worst +
+                                        current_file_paths_d1_best +
+                                        current_file_paths_d1_worst +
+                                        historical_file_paths_epe_best +
+                                        historical_file_paths_epe_worst +
+                                        historical_file_paths_d1_best +
+                                        historical_file_paths_d1_worst)
+                scores_to_write = []
+                lefts_to_write = []
+                rights_to_write = []
+                disp_preds_to_write = []
+                disp_gts_to_write = []
+                for data in tqdm(val_loader, dynamic_ncols=True, disable=not accelerator.is_main_process, desc="Saving images for validation"):
+                    (imageL_file, imageR_file, GT_file), left, right, disp_gt, valid = [x for x in data]
+                    has_tracking_file = False
+                    for image_path in imageL_file:
+                        if image_path in paths_to_save:
+                            has_tracking_file = True
+                            break
+                    if not has_tracking_file:
+                        continue
+                    padder = InputPadder(left.shape, divis_by=32)
+                    left = left.to(accelerator.device)
+                    right = right.to(accelerator.device)
+                    disp_gt = disp_gt.to(accelerator.device)
+                    valid = valid.to(accelerator.device)
+                    left, right = padder.pad(left, right)
+                    with torch.no_grad():
+                        disp_pred = model(left, right, iters=cfg.valid_iters, test_mode=True)
+                    disp_pred = padder.unpad(disp_pred)
+                    assert disp_pred.shape == disp_gt.shape, (disp_pred.shape, disp_gt.shape)
+                    for b in range(left.shape[0]):
+                        if imageL_file[b] not in paths_to_save:
+                            continue
+                        left_np = left[b].squeeze().cpu().numpy()
+                        right_np = right[b].squeeze().cpu().numpy()
+                        left_np = (left_np - left_np.min()) / (left_np.max() - left_np.min()) * 255
+                        right_np = (right_np - right_np.min()) / (right_np.max() - right_np.min()) * 255
+                        disp_pred_np = gray_2_colormap_np(disp_pred[b].squeeze())
+                        disp_gt_np = gray_2_colormap_np(disp_gt[b].squeeze())
+
+                        valid_mask = valid[b] >= 0.5
+                        if valid_mask.sum() == 0:
+                            continue
+
+                        epe_per_pixel = torch.abs(disp_pred[b].squeeze() - disp_gt[b].squeeze())
+                        epe_mean = epe_per_pixel[valid_mask].mean().item()
+                        d1_mean = (epe_per_pixel > 3.0).float()[valid_mask].mean().item() * 100
+
+                        if imageL_file[b] in historical_file_paths_epe_worst:
+                            index = historical_file_paths_epe_worst.index(imageL_file[b])
+                            left_name = f"val/epe_worst_{index}_left_historical"
+                            right_name = f"val/epe_worst_{index}_right_historical"
+                            disp_pred_name = f"val/epe_worst_{index}_disp_pred_historical"
+                            disp_gt_name = f"val/epe_worst_{index}_disp_gt_historical"
+                            score_name = f"val/epe_worst_{index}_score_historical"
+                            score = epe_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+
+                        if imageL_file[b] in historical_file_paths_epe_best:
+                            index = historical_file_paths_epe_best.index(imageL_file[b])
+                            left_name = f"val/epe_best_{index}_left_historical"
+                            right_name = f"val/epe_best_{index}_right_historical"
+                            disp_pred_name = f"val/epe_best_{index}_disp_pred_historical"
+                            disp_gt_name = f"val/epe_best_{index}_disp_gt_historical"
+                            score_name = f"val/epe_best_{index}_score_historical"
+                            score = epe_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+
+                        if imageL_file[b] in historical_file_paths_d1_worst:
+                            index = historical_file_paths_d1_worst.index(imageL_file[b])
+                            left_name = f"val/d1_worst_{index}_left_historical"
+                            right_name = f"val/d1_worst_{index}_right_historical"
+                            disp_pred_name = f"val/d1_worst_{index}_disp_pred_historical"
+                            disp_gt_name = f"val/d1_worst_{index}_disp_gt_historical"
+                            score_name = f"val/d1_worst_{index}_score_historical"
+                            score = d1_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+
+                        if imageL_file[b] in historical_file_paths_d1_best:
+                            index = historical_file_paths_d1_best.index(imageL_file[b])
+                            left_name = f"val/d1_best_{index}_left_historical"
+                            right_name = f"val/d1_best_{index}_right_historical"
+                            disp_pred_name = f"val/d1_best_{index}_disp_pred_historical"
+                            disp_gt_name = f"val/d1_best_{index}_disp_gt_historical"
+                            score_name = f"val/d1_best_{index}_score_historical"
+                            score = d1_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+
+                        if imageL_file[b] in current_file_paths_epe_worst:
+                            index = current_file_paths_epe_worst.index(imageL_file[b])
+                            left_name = f"val/epe_worst_{index}_left_current"
+                            right_name = f"val/epe_worst_{index}_right_current"
+                            disp_pred_name = f"val/epe_worst_{index}_disp_pred_current"
+                            disp_gt_name = f"val/epe_worst_{index}_disp_gt_current"
+                            score_name = f"val/epe_worst_{index}_score_current"
+                            score = epe_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+
+                        if imageL_file[b] in current_file_paths_epe_best:
+                            index = current_file_paths_epe_best.index(imageL_file[b])
+                            left_name = f"val/epe_best_{index}_left_current"
+                            right_name = f"val/epe_best_{index}_right_current"
+                            disp_pred_name = f"val/epe_best_{index}_disp_pred_current"
+                            disp_gt_name = f"val/epe_best_{index}_disp_gt_current"
+                            score_name = f"val/epe_best_{index}_score_current"
+                            score = epe_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+
+                        if imageL_file[b] in current_file_paths_d1_worst:
+                            index = current_file_paths_d1_worst.index(imageL_file[b])
+                            left_name = f"val/d1_worst_{index}_left_current"
+                            right_name = f"val/d1_worst_{index}_right_current"
+                            disp_pred_name = f"val/d1_worst_{index}_disp_pred_current"
+                            disp_gt_name = f"val/d1_worst_{index}_disp_gt_current"
+                            score_name = f"val/d1_worst_{index}_score_current"
+                            score = d1_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+
+                        if imageL_file[b] in current_file_paths_d1_best:
+                            index = current_file_paths_d1_best.index(imageL_file[b])
+                            left_name = f"val/d1_best_{index}_left_current"
+                            right_name = f"val/d1_best_{index}_right_current"
+                            disp_pred_name = f"val/d1_best_{index}_disp_pred_current"
+                            disp_gt_name = f"val/d1_best_{index}_disp_gt_current"
+                            score_name = f"val/d1_best_{index}_score_current"
+                            score = d1_mean
+                            scores_to_write.append((score_name, score))
+                            lefts_to_write.append((left_name, left_np))
+                            rights_to_write.append((right_name, right_np))
+                            disp_preds_to_write.append((disp_pred_name, disp_pred_np))
+                            disp_gts_to_write.append((disp_gt_name, disp_gt_np))
+                    # Historical images
+                print(f"Saving scores_to_write_{accelerator.process_index}.pkl")
+                with open(os.path.join(temp_dir, f'scores_to_write_{accelerator.process_index}.pkl'), 'wb') as f:
+                    pickle.dump(scores_to_write, f)
+                print(f"Saving lefts_to_write_{accelerator.process_index}.pkl")
+                with open(os.path.join(temp_dir, f'lefts_to_write_{accelerator.process_index}.pkl'), 'wb') as f:
+                    pickle.dump(lefts_to_write, f)
+                print(f"Saving rights_to_write_{accelerator.process_index}.pkl")
+                with open(os.path.join(temp_dir, f'rights_to_write_{accelerator.process_index}.pkl'), 'wb') as f:
+                    pickle.dump(rights_to_write, f)
+                print(f"Saving disp_preds_to_write_{accelerator.process_index}.pkl")
+                with open(os.path.join(temp_dir, f'disp_preds_to_write_{accelerator.process_index}.pkl'), 'wb') as f:
+                    pickle.dump(disp_preds_to_write, f)
+                print(f"Saving disp_gts_to_write_{accelerator.process_index}.pkl")
+                with open(os.path.join(temp_dir, f'disp_gts_to_write_{accelerator.process_index}.pkl'), 'wb') as f:
+                    pickle.dump(disp_gts_to_write, f)
+                print(f"Done saving files_{accelerator.process_index}.pkl")
+                accelerator.wait_for_everyone()
+                print(f"Done waiting for everyone_{accelerator.process_index}")
+                if accelerator.is_main_process:
+                    tracker = accelerator.get_tracker('tensorboard')
+                    writer = tracker.writer
+                    for i in range(accelerator.num_processes):
+                        print(f"Loading scores_to_write_{i}.pkl")
+                        with open(os.path.join(temp_dir, f'scores_to_write_{i}.pkl'), 'rb') as f:
+                            data = pickle.load(f)
+                            print(f"Data length: {len(data)}")
+                            for (score_name, score) in data:
+                                print(f"Logging score_name: {score_name}, score: {score}")
+                                accelerator.log({score_name: score}, epoch)
+                        print(f"Loading lefts_to_write_{i}.pkl")
+                        with open(os.path.join(temp_dir, f'lefts_to_write_{i}.pkl'), 'rb') as f:
+                            data = pickle.load(f)
+                            print(f"Data length: {len(data)}")
+                            for (left_name, left_np) in data:
+                                print(f"Logging left_name: {left_name}")
+                                writer.add_image(left_name, left_np.astype(np.uint8), epoch, dataformats='CHW')
+                        print(f"Loading rights_to_write_{i}.pkl")
+                        with open(os.path.join(temp_dir, f'rights_to_write_{i}.pkl'), 'rb') as f:
+                            data = pickle.load(f)
+                            print(f"Data length: {len(data)}")
+                            for (right_name, right_np) in data:
+                                print(f"Logging right_name: {right_name}")
+                                writer.add_image(right_name, right_np.astype(np.uint8), epoch, dataformats='CHW')
+                        print(f"Loading disp_preds_to_write_{i}.pkl")
+                        with open(os.path.join(temp_dir, f'disp_preds_to_write_{i}.pkl'), 'rb') as f:
+                            data = pickle.load(f)
+                            print(f"Data length: {len(data)}")
+                            for (disp_pred_name, disp_pred_np) in data:
+                                print(f"Logging disp_pred_name: {disp_pred_name}")
+                                writer.add_image(disp_pred_name, disp_pred_np, epoch, dataformats='HWC')
+                        print(f"Loading disp_gts_to_write_{i}.pkl")
+                        with open(os.path.join(temp_dir, f'disp_gts_to_write_{i}.pkl'), 'rb') as f:
+                            data = pickle.load(f)
+                            print(f"Data length: {len(data)}")
+                            for (disp_gt_name, disp_gt_np) in data:
+                                print(f"Logging disp_gt_name: {disp_gt_name}")
+                                writer.add_image(disp_gt_name, disp_gt_np, epoch, dataformats='HWC')
+                
+                if accelerator.is_main_process:
+                    shutil.rmtree(temp_dir)
+                accelerator.wait_for_everyone()
+                print(f"Done waiting for everyone_{accelerator.process_index}")
+                if d1_early_stoppers[accelerator.process_index](d1_mean, epoch) and epe_early_stoppers[accelerator.process_index](epe_mean, epoch):
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
                     break
 
+            
             if not should_keep_training:
                 break
 
+            accelerator.wait_for_everyone()
             active_train_loader = train_loader
             model.train()
             model.module.freeze_bn()
 
-            for data in tqdm(active_train_loader, dynamic_ncols=True, disable=not accelerator.is_main_process):
+            print(f"Starting training_{accelerator.process_index}")
+            for data in tqdm(active_train_loader, dynamic_ncols=True, disable=not accelerator.is_main_process, desc="Training"):
                 image_list, left, right, disp_gt, valid = [x for x in data]
-
-                with accelerator.autocast():
-                    disp_init_pred, disp_preds, depth_mono = model(left, right, iters=cfg.train_iters)
-
-                        
+                disp_init_pred, disp_preds, depth_mono = model(left, right, iters=cfg.train_iters)
                 loss, metrics = sequence_loss(disp_preds, disp_init_pred, disp_gt, valid, max_disp=cfg.max_disp)
                 accelerator.backward(loss)
                 accelerator.clip_grad_norm_(model.parameters(), 1.0)
@@ -332,26 +626,6 @@ def main(cfg):
                 metrics = accelerator.reduce(metrics, reduction='mean')
                 accelerator.log({'train/loss': loss_val, 'train/learning_rate': optimizer.param_groups[0]['lr']}, total_step)
                 accelerator.log(metrics, total_step)
-
-
-                    
-                ####visualize the depth_mono and disp_preds
-                if total_step % cfg.train_image_frequency == 0:
-                    if accelerator.is_main_process:
-                        image1_np = left[0].squeeze().cpu().numpy()
-                        image1_np = (image1_np - image1_np.min()) / (image1_np.max() - image1_np.min()) * 255.0
-                        image1_np = image1_np.astype(np.uint8)
-
-                        depth_mono_np = gray_2_colormap_np(depth_mono[0].squeeze())
-                        disp_preds_np = gray_2_colormap_np(disp_preds[-1][0].squeeze())
-                        disp_gt_np = gray_2_colormap_np(disp_gt[0].squeeze())
-                        tracker = accelerator.get_tracker('tensorboard')
-                        writer = tracker.writer
-                        writer.add_image("train/left", image1_np, total_step, dataformats='CHW') 
-                        writer.add_image("train/disp_pred", disp_preds_np, total_step, dataformats='HWC')
-                        writer.add_image("train/disp_gt", disp_gt_np, total_step, dataformats='HWC')
-                        writer.add_image("train/depth_mono", depth_mono_np, total_step, dataformats='HWC')
-                    accelerator.wait_for_everyone()  
 
                 if (total_step > 0) and (total_step % cfg.save_frequency == 0):
                     if accelerator.is_main_process:
@@ -372,7 +646,7 @@ def main(cfg):
                 
             epoch += 1
 
-
+        del disp_gt, valid, image_list, left, right, disp_init_pred, disp_preds, depth_mono
         if accelerator.is_main_process:
             save_path = Path(cfg.save_path + f'/{cfg.project_name}_{total_step}.pth')
             model_save = accelerator.unwrap_model(model)
@@ -392,7 +666,3 @@ def main(cfg):
 
 if __name__ == '__main__':
     main()
-
-
-
-

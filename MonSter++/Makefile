@@ -21,4 +21,4 @@ datasets_us3d_train:
 jupyter_notebook_gpu_run:
 	bash scripts/jupyter_notebook_gpu_run.sh
 tensorboard_us3d:
-	tensorboard --logdir ./logs/us3d/
+	bash scripts/tensorboard_us3d.sh

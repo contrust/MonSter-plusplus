@@ -595,16 +595,29 @@ class StereoBlur(StereoDataset):
 def fetch_dataloader(args, use_augmentation=True):
     """ Create the data loader for the corresponding trainign set """
     # print('args.img_gamma', args.img_gamma)
+    aug_params = {}
     if use_augmentation:
-        aug_params = {'crop_size': list(args.image_size), 'min_scale': args.spatial_scale[0], 'max_scale': args.spatial_scale[1], 'do_flip': False, 'yjitter': not args.noyjitter}
-        if hasattr(args, "saturation_range") and args.saturation_range is not None:
-            aug_params["saturation_range"] = list(args.saturation_range)
-        if hasattr(args, "img_gamma") and args.img_gamma is not None:
-            aug_params["gamma"] = args.img_gamma
-        if hasattr(args, "do_flip") and args.do_flip is not None:
-            aug_params["do_flip"] = args.do_flip
-    else:
-        aug_params = {}
+        aug_params = {
+            'crop_size': list(args.image_size),
+            'min_scale': args.min_scale,
+            'max_scale': args.max_scale,
+            'do_flip': args.do_flip,
+            'yjitter': args.yjitter,
+            'brightness_range': args.brightness_range,
+            'contrast_range': args.contrast_range,
+            'saturation_range': args.saturation_range,
+            'hue_range': args.hue_range,
+            'gamma': args.gamma,
+            'spatial_aug_prob': args.spatial_aug_prob,
+            'stretch_prob': args.stretch_prob,
+            'max_stretch': args.max_stretch,
+            'h_flip_prob': args.h_flip_prob,
+            'v_flip_prob': args.v_flip_prob,
+            'asymmetric_color_aug_prob': args.asymmetric_color_aug_prob,
+            'noise_aug_prob': args.noise_aug_prob,
+            'noise_sigma_range': args.noise_sigma_range,
+            'eraser_aug_prob': args.eraser_aug_prob,
+        }
 
     train_dataset = None
     print('train_datasets', args.train_datasets)
