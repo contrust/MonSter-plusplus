@@ -11,7 +11,7 @@ import random
 from pathlib import Path
 from glob import glob
 import os.path as osp
-
+from omegaconf.listconfig import ListConfig
 import gzip
 from collections import defaultdict
 from typing import List, Optional
@@ -603,11 +603,11 @@ def fetch_dataloader(args, use_augmentation=True):
             'max_scale': args.max_scale,
             'do_flip': args.do_flip,
             'yjitter': args.yjitter,
-            'brightness_range': args.brightness_range,
-            'contrast_range': args.contrast_range,
-            'saturation_range': args.saturation_range,
-            'hue_range': args.hue_range,
-            'gamma': args.gamma,
+            'brightness_range': list(args.brightness_range) if isinstance(args.brightness_range, ListConfig) else args.brightness_range,
+            'contrast_range': list(args.contrast_range) if isinstance(args.contrast_range, ListConfig) else args.contrast_range,
+            'saturation_range': list(args.saturation_range) if isinstance(args.saturation_range, ListConfig) else args.saturation_range,
+            'hue_range': list(args.hue_range) if isinstance(args.hue_range, ListConfig) else args.hue_range,
+            'gamma': list(args.gamma) if isinstance(args.gamma, ListConfig) else args.gamma,
             'spatial_aug_prob': args.spatial_aug_prob,
             'stretch_prob': args.stretch_prob,
             'max_stretch': args.max_stretch,
@@ -615,7 +615,7 @@ def fetch_dataloader(args, use_augmentation=True):
             'v_flip_prob': args.v_flip_prob,
             'asymmetric_color_aug_prob': args.asymmetric_color_aug_prob,
             'noise_aug_prob': args.noise_aug_prob,
-            'noise_sigma_range': args.noise_sigma_range,
+            'noise_sigma_range': list(args.noise_sigma_range) if isinstance(args.noise_sigma_range, ListConfig) else args.noise_sigma_range,
             'eraser_aug_prob': args.eraser_aug_prob,
         }
 

@@ -150,6 +150,7 @@ def fetch_optimizer(args, model):
 
 @hydra.main(version_base=None, config_path='config', config_name='train_us3d')
 def main(cfg):
+    print(cfg)
     set_seed(cfg.seed)
     Path(cfg.save_path).mkdir(exist_ok=True, parents=True)
     kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
@@ -597,7 +598,10 @@ def main(cfg):
                     shutil.rmtree(temp_dir)
                 accelerator.wait_for_everyone()
                 print(f"Done waiting for everyone_{accelerator.process_index}")
-                if d1_early_stopper(aggregated_d1_mean, epoch) and epe_early_stopper(aggregated_epe_mean, epoch):
+                should_d1_early_stop = d1_early_stopper(aggregated_d1_mean, epoch)
+                should_epe_early_stop = epe_early_stopper(aggregated_epe_mean, epoch)
+                print(f"Should d1 early stop: {should_d1_early_stop}, Should epe early stop: {should_epe_early_stop} at epoch {epoch} in process {accelerator.process_index}")
+                if should_d1_early_stop and should_epe_early_stop:
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
                     break

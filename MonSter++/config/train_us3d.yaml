@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-baseline-photo-aug-medium
+project_name: monster-us3d-baseline-photo-aug-constast
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 metrics_base_path: ./metrics/us3d/
@@ -36,11 +36,11 @@ min_scale: -0.2
 max_scale: 0.0
 do_flip: ''
 yjitter: False
-brightness_range: 0.3
-contrast_range: 0.3
-saturation_range: 0.3
+brightness_range: 0.2
+contrast_range: [0.85, 1.35]
+saturation_range: 0.2
 hue_range: 0.1
-gamma: [0.8, 1.2]
+gamma: [0.85, 1.35]
 spatial_aug_prob: 0.0
 stretch_prob: 0.0
 max_stretch: 0.0
