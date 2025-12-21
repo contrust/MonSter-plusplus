@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-baseline-photo-aug-light
+project_name: monster-us3d-baseline-photo-aug-medium
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 metrics_base_path: ./metrics/us3d/
@@ -8,10 +8,10 @@ encoder: 'vitl'
 batch_size: 16
 val_batch_size: 16
 train_datasets: ['us3d']
-d1_patience: 5
-d1_min_delta: 0.0003
-epe_patience: 5
-epe_min_delta: 0.002
+d1_patience: 3
+d1_min_delta: 0.01
+epe_patience: 3
+epe_min_delta: 0.005
 lr: 1e-4
 wdecay: 1e-5
 current_total_step: 0
@@ -36,11 +36,11 @@ min_scale: -0.2
 max_scale: 0.0
 do_flip: ''
 yjitter: False
-brightness_range: 0.2
-contrast_range: 0.2
-saturation_range: 0.2
-hue_range: 0.05
-gamma: [0.9, 1.1]
+brightness_range: 0.3
+contrast_range: 0.3
+saturation_range: 0.3
+hue_range: 0.1
+gamma: [0.8, 1.2]
 spatial_aug_prob: 0.0
 stretch_prob: 0.0
 max_stretch: 0.0
