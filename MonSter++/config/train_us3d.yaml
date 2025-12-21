@@ -1,9 +1,9 @@
 tensorboard: {}
-project_name: monster-us3d-baseline-photo-aug-light
+project_name: monster-us3d-baseline-noise-aug-medium
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 metrics_base_path: ./metrics/us3d/
-temp_dir: ./temp/us3d/
+temp_dir: /tmp/s0214/us3d/
 encoder: 'vitl'
 batch_size: 16
 val_batch_size: 16
@@ -48,7 +48,7 @@ h_flip_prob: 0.0
 v_flip_prob: 0.0
 asymmetric_color_aug_prob: 0.0
 noise_aug_prob: 1.0
-noise_sigma_range: [0.0, 0.1]
+noise_sigma_range: [0.0, 0.05]
 eraser_aug_prob: 0.0
 num_gpu: 8
 seed: 666
