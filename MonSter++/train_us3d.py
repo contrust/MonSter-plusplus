@@ -180,7 +180,7 @@ def main(cfg):
     accelerator.init_trackers(project_name=cfg.project_name, config=hparams_config, init_kwargs={'tensorboard': cfg.tensorboard})
 
     train_dataset = datasets.fetch_dataloader(cfg)
-    val_dataset = datasets.US3D(aug_params=None, split='val')
+    val_dataset = datasets.US3D(aug_params=None, split='test')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=cfg.batch_size,
         pin_memory=True, shuffle=True, num_workers=int(1), drop_last=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.val_batch_size,
@@ -358,6 +358,7 @@ def main(cfg):
                                      'val/d1_mean': aggregated_d1_mean}, epoch)
                 accelerator.wait_for_everyone()
 
+                
                 best_epe_list = aggregated_epe_list[:num_best_images]
                 worst_epe_list = list(reversed(aggregated_epe_list[-num_worst_images:]))
                 best_d1_list = aggregated_d1_list[:num_best_images]
@@ -604,9 +605,8 @@ def main(cfg):
                 if should_d1_early_stop and should_epe_early_stop:
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
-                    break
 
-            
+            break
             if not should_keep_training:
                 break
 
@@ -653,6 +653,7 @@ def main(cfg):
             epoch += 1
 
         del disp_gt, valid, image_list, left, right, disp_init_pred, disp_preds, depth_mono
+        
         if accelerator.is_main_process:
             save_path = Path(cfg.save_path + f'/{cfg.project_name}_{total_step}.pth')
             model_save = accelerator.unwrap_model(model)
@@ -664,6 +665,9 @@ def main(cfg):
             }
             torch.save(checkpoint, save_path)
             del model_save
+
+        
+        
   
         accelerator.end_training()
     finally:

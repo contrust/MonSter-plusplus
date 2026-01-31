@@ -348,9 +348,10 @@ class SparseFlowAugmentor:
     def noise_transform(self, img1, img2):
         if np.random.rand() < self.noise_aug_prob:
             sigma = np.random.uniform(self.noise_sigma_range[0], self.noise_sigma_range[1])
-            noise = np.random.normal(0, sigma, img1.shape).astype(np.float32)
-            img1 = np.clip(img1 + noise, 0, 255)
-            img2 = np.clip(img2 + noise, 0, 255)
+            noise1 = np.random.normal(0, sigma, img1.shape).astype(np.float32)
+            noise2 = np.random.normal(0, sigma, img2.shape).astype(np.float32)
+            img1 = np.clip(img1 + noise1, 0, 255)
+            img2 = np.clip(img2 + noise2, 0, 255)
         return img1, img2
 
 
