@@ -1,6 +1,6 @@
 tensorboard: {}
-project_name: monster-us3d-baseline-best-test
-restore_ckpt: ./checkpoints/us3d/monster-us3d-baseline-best_4942.pth
+project_name: monster-us3d-baseline-grayscale
+restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 metrics_base_path: ./metrics/us3d/
 temp_dir: /tmp/s0214/us3d/
@@ -42,7 +42,7 @@ saturation_range: 0.0
 hue_range: 0.00
 gamma: [1.0, 1.0]
 spatial_aug_prob: 0.0
-grayscale_aug_prob: 0.0
+grayscale_aug_prob: 1.0
 stretch_prob: 0.0
 max_stretch: 0.0
 h_flip_prob: 0.0
