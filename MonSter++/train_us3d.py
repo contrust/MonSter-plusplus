@@ -180,7 +180,7 @@ def main(cfg):
     accelerator.init_trackers(project_name=cfg.project_name, config=hparams_config, init_kwargs={'tensorboard': cfg.tensorboard})
 
     train_dataset = datasets.fetch_dataloader(cfg)
-    val_dataset = datasets.US3D(aug_params=None, split='test')
+    val_dataset = datasets.US3D(aug_params=None, split='val')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=cfg.batch_size,
         pin_memory=True, shuffle=True, num_workers=int(1), drop_last=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.val_batch_size,
