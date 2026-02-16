@@ -215,6 +215,7 @@ class SparseFlowAugmentor:
                  asymmetric_color_aug_prob=0.0,
                  noise_aug_prob=0.0,
                  noise_sigma_range=[0.0, 0.0],
+                 grayscale_aug_prob=0.0,
                  eraser_aug_prob=0.0):
         # spatial augmentation params.
         self.crop_size = crop_size
@@ -237,6 +238,19 @@ class SparseFlowAugmentor:
         self.photo_aug = Compose([ColorJitter(brightness=brightness_range, contrast=contrast_range, saturation=saturation_range, hue=hue_range), AdjustGamma(*gamma)])
         self.asymmetric_color_aug_prob = asymmetric_color_aug_prob
         self.eraser_aug_prob = eraser_aug_prob
+        self.grayscale_aug_prob = grayscale_aug_prob
+
+    def _get_grayscale_image(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        img = np.tile(img[...,None], (1, 1, 3))
+        return img
+
+
+    def grayscale_transform(self, img1, img2):
+        if np.random.rand() < self.grayscale_aug_prob:
+            img1 = self._get_grayscale_image(img1)
+            img2 = self._get_grayscale_image(img2)
+        return img1, img2
         
     def color_transform(self, img1, img2):
         image_stack = np.concatenate([img1, img2], axis=0)
@@ -358,6 +372,7 @@ class SparseFlowAugmentor:
     def __call__(self, img1, img2, flow, valid):
         img1, img2 = self.color_transform(img1, img2)
         img1, img2 = self.noise_transform(img1, img2)
+        img1, img2 = self.grayscale_transform(img1, img2)
         #img1, img2 = self.eraser_transform(img1, img2)
         img1, img2, flow, valid = self.spatial_transform(img1, img2, flow, valid)
 

@@ -42,6 +42,7 @@ saturation_range: 0.0
 hue_range: 0.00
 gamma: [1.0, 1.0]
 spatial_aug_prob: 0.0
+grayscale_aug_prob: 0.0
 stretch_prob: 0.0
 max_stretch: 0.0
 h_flip_prob: 0.0

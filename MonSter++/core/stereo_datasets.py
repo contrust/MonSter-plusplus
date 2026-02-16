@@ -617,6 +617,7 @@ def fetch_dataloader(args, use_augmentation=True):
             'noise_aug_prob': args.noise_aug_prob,
             'noise_sigma_range': list(args.noise_sigma_range) if isinstance(args.noise_sigma_range, ListConfig) else args.noise_sigma_range,
             'eraser_aug_prob': args.eraser_aug_prob,
+            'grayscale_aug_prob': args.grayscale_aug_prob,
         }
 
     train_dataset = None
