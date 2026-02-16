@@ -22,6 +22,7 @@ save_path: ./checkpoints/us3d/
 val_frequency: 1
 num_worst_images: 4
 num_best_images: 2
+save_val_images: False
 image_size: [256, 1024]
 train_iters: 22
 valid_iters: 32

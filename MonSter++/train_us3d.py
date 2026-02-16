@@ -358,7 +358,6 @@ def main(cfg):
                                      'val/d1_mean': aggregated_d1_mean}, epoch)
                 accelerator.wait_for_everyone()
 
-                
                 best_epe_list = aggregated_epe_list[:num_best_images]
                 worst_epe_list = list(reversed(aggregated_epe_list[-num_worst_images:]))
                 best_d1_list = aggregated_d1_list[:num_best_images]
@@ -375,6 +374,7 @@ def main(cfg):
                     historical_file_paths_d1_best = [fp for _, fp in best_d1_list]
                     historical_file_paths_d1_worst = [fp for _, fp in worst_d1_list]
 
+                
                 paths_to_save = set(current_file_paths_epe_best +
                                         current_file_paths_epe_worst +
                                         current_file_paths_d1_best +
@@ -566,6 +566,8 @@ def main(cfg):
                             for (score_name, score) in data:
                                 print(f"Logging score_name: {score_name}, score: {score}")
                                 accelerator.log({score_name: score}, epoch)
+                        if not cfg.save_val_images:
+                            continue
                         print(f"Loading lefts_to_write_{i}.pkl")
                         with open(os.path.join(temp_dir, f'lefts_to_write_{i}.pkl'), 'rb') as f:
                             data = pickle.load(f)
@@ -594,7 +596,7 @@ def main(cfg):
                             for (disp_gt_name, disp_gt_np) in data:
                                 print(f"Logging disp_gt_name: {disp_gt_name}")
                                 writer.add_image(disp_gt_name, disp_gt_np, epoch, dataformats='HWC')
-                
+
                 if accelerator.is_main_process:
                     shutil.rmtree(temp_dir)
                 accelerator.wait_for_everyone()
