@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-baseline-grayscale
+project_name: monster-us3d-baseline-epe-loss
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 metrics_base_path: ./metrics/us3d/
@@ -12,7 +12,7 @@ d1_patience: 3
 d1_min_delta: 0.01
 epe_patience: 3
 epe_min_delta: 0.003
-lr: 1e-4
+lr: 2e-5
 wdecay: 1e-5
 current_total_step: 0
 current_val_step: 0
@@ -43,7 +43,7 @@ saturation_range: 0.0
 hue_range: 0.00
 gamma: [1.0, 1.0]
 spatial_aug_prob: 0.0
-grayscale_aug_prob: 1.0
+grayscale_aug_prob: 0.0
 stretch_prob: 0.0
 max_stretch: 0.0
 h_flip_prob: 0.0
