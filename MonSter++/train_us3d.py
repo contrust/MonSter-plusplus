@@ -606,7 +606,6 @@ def main(cfg):
                     should_keep_training = False
                     print(f"Early stopping at epoch {epoch}")
 
-            break
             if not should_keep_training:
                 break
 
