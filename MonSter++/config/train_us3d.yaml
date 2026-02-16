@@ -49,7 +49,7 @@ max_stretch: 0.0
 h_flip_prob: 0.0
 v_flip_prob: 0.0
 asymmetric_color_aug_prob: 0.0
-noise_aug_prob: 0.25
+noise_aug_prob: 0.0
 noise_sigma_range: [0.0, 2.0]
 eraser_aug_prob: 0.0
 num_gpu: 8
