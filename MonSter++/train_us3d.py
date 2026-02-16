@@ -123,12 +123,13 @@ def sequence_loss(disp_preds, disp_init_pred, disp_gt, valid, loss_gamma=0.9, ma
     if valid.bool().sum() == 0:
         epe = torch.Tensor([0.0]).cuda()
 
-    epe_mean = epe.mean()
+    epe_mean_tensor = epe.mean()
+    epe_mean_scalar = epe_mean_tensor.item()
     
-    disp_loss *= epe_mean
+    disp_loss *= epe_mean_scalar
 
     metrics = {
-        'train/epe': epe.mean(),
+        'train/epe': epe_mean_tensor,
         'train/d1_1px': (epe > 1).float().mean() * 100,
         'train/d1_2px': (epe > 2).float().mean() * 100,
         'train/d1_3px': (epe > 3).float().mean() * 100,
