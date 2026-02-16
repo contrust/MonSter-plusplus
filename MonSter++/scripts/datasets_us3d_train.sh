@@ -1,7 +1,7 @@
 #!/bin/sh
 
 SBATCH_CPU=""
-SBATCH_CPU="-p tesla-v100 --gres=gpu:8"
+SBATCH_CPU="-p v100 --gres=gpu:8"
 
 sbatch -n1 \
 --cpus-per-task=10 \
