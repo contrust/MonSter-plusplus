@@ -8,10 +8,10 @@ encoder: 'vitl'
 batch_size: 16
 val_batch_size: 16
 train_datasets: ['us3d']
-d1_patience: 3
-d1_min_delta: 0.01
-epe_patience: 3
-epe_min_delta: 0.003
+d1_patience: 5
+d1_min_delta: 0.001
+epe_patience: 5
+epe_min_delta: 0.001
 lr: 2.5e-4
 wdecay: 1e-5
 current_total_step: 0
