@@ -124,9 +124,10 @@ def sequence_loss(disp_preds, disp_init_pred, disp_gt, valid, loss_gamma=0.9, ma
         epe = torch.Tensor([0.0]).cuda()
 
     epe_mean_tensor = epe.mean()
+    """
     epe_mean_scalar = epe_mean_tensor.item()
-    
     disp_loss *= epe_mean_scalar
+    """
 
     metrics = {
         'train/epe': epe_mean_tensor,
