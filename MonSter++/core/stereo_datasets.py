@@ -745,6 +745,11 @@ def fetch_dataloader(args, use_augmentation=True):
         elif dataset_name == 'us3d':
             new_dataset = US3D(aug_params)
             logging.info(f"Adding {len(new_dataset)} samples from US3D")
+        elif dataset_name == 'us3d_train_and_test':
+            us3d_train = US3D(aug_params, split='train')
+            us3d_test = US3D(aug_params, split='test')
+            new_dataset = us3d_train + us3d_test
+            logging.info(f"Adding {len(new_dataset)} samples from US3D Train and Test")
         train_dataset = new_dataset if train_dataset is None else train_dataset + new_dataset
 
     return train_dataset
