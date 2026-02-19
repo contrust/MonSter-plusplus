@@ -8,9 +8,9 @@ encoder: 'vitl'
 batch_size: 16
 val_batch_size: 16
 train_datasets: ['us3d-train-and-test']
-d1_patience: 5
+d1_patience: 4
 d1_min_delta: 0.001
-epe_patience: 5
+epe_patience: 4
 epe_min_delta: 0.001
 lr: 2.5e-4
 wdecay: 1e-5
