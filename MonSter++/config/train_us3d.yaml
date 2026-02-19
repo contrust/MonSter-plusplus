@@ -1,5 +1,5 @@
 tensorboard: {}
-project_name: monster-us3d-baseline-grayscale-lr2.5e-4
+project_name: monster-us3d-baseline-grayscale-lr2.5e-4-train-and-test
 restore_ckpt: ./checkpoints/Mix_all_large.pth
 project_dir: ./logs/us3d/
 metrics_base_path: ./metrics/us3d/
@@ -7,7 +7,7 @@ temp_dir: /tmp/s0214/us3d/
 encoder: 'vitl'
 batch_size: 16
 val_batch_size: 16
-train_datasets: ['us3d']
+train_datasets: ['us3d-train-and-test']
 d1_patience: 5
 d1_min_delta: 0.001
 epe_patience: 5
