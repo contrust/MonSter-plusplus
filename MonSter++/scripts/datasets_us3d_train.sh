@@ -1,6 +1,6 @@
 #!/bin/sh
 
-NODE="tesla-a100"
+NODE="tesla-v100"
 SBATCH_CPU=""
 SBATCH_CPU="-p hiperf -w ${NODE} --gres=gpu:8"
 
